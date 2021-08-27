@@ -72,6 +72,25 @@ fn read_program(opts: &Opts) -> String {
   return program;
 }
 
+fn output_err(err: String, format: Format) {
+  match format {
+    Format::Alfred => {
+      println!(
+        "\
+<?xml version=\"1.0\"?>
+<items>
+  <item arg=\"{0}\" valid=\"NO\" autocomplete=\"{0}\" type=\"default\">
+    <title>{0}</title>
+    <subtitle><![CDATA[{1}]]></subtitle>
+  </item>
+</items>",
+        "...", err
+      )
+    }
+    _ => eprintln!("{}", err),
+  }
+}
+
 fn main() {
   let mut format = Format::Default;
   let mut opts = Opts::parse();
@@ -84,7 +103,7 @@ fn main() {
       "oct" => Format::Octal,
       "alfred" => Format::Alfred,
       _ => {
-        eprint!("bad output format: {}", fmt);
+        eprintln!("bad output format: {}", fmt);
         process::exit(1);
       }
     }
@@ -98,7 +117,7 @@ fn main() {
   let mut buffer = match Buffer::create(&opts) {
     Ok(b) => b,
     Err(err) => {
-      eprint!("failed to read buffer: {}", err);
+      output_err(format!("failed to read buffer: {}", err), format);
       process::exit(1);
     }
   };
@@ -109,7 +128,7 @@ fn main() {
   let tokens = match tokenize(program.as_bytes()) {
     Ok(tokens) => tokens,
     Err(err) => {
-      eprintln!("{}", err);
+      output_err(err, format);
       process::exit(1);
     }
   };
@@ -118,7 +137,7 @@ fn main() {
     Ok(value) => value,
     Err(err) => {
       buffer.save();
-      eprintln!("{}", err);
+      output_err(err, format);
       process::exit(1);
     }
   };
