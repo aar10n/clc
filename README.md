@@ -87,9 +87,9 @@ The following types are supported:
 | `u16()`   | Casts number to u16                 | `u16`    |
 | `u8() `   | Casts number to u8                  | `u8`     |
 | `i64()`   | Casts number to i64                 | `i64`    |
-| `i32()`   | Casts number to i32                 | `i64`    |
-| `i16()`   | Casts number to i16                 | `i64`    |
-| `i8()`    | Casts number to i8                  | `i64`    |
+| `i32()`   | Casts number to i32                 | `i32`    |
+| `i16()`   | Casts number to i16                 | `i16`    |
+| `i8()`    | Casts number to i8                  | `i8`    |
 
 ## Author
 
