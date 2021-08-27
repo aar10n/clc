@@ -172,8 +172,9 @@ macro_rules! impl_from_value {
     impl From<Value> for $t {
       fn from(src: Value) -> $t {
         use Value::*;
+        use Width::*;
         return match src {
-          Integer(v, _) => v as $t,
+          Integer(v, w) => do_cast!(v, w, $t),
           Float(v) => v as $t,
         };
       }

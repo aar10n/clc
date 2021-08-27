@@ -365,9 +365,11 @@ pub fn tokenize(program: &[u8]) -> Result<Vec<Token>, String> {
 
         if is_unary(op_str) {
           let unary = match tokens.last() {
-            Some(Token::Integer(_)) | Some(Token::Float(_)) | Some(Token::Reference(_)) | Some(Token::RParen()) => {
-              false
-            }
+            Some(Token::Integer(_))
+            | Some(Token::Float(_))
+            | Some(Token::Identifier(_))
+            | Some(Token::Reference(_))
+            | Some(Token::RParen()) => false,
             _ => true,
           };
 
