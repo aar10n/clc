@@ -29,6 +29,21 @@ macro_rules! unary_call {
   };
 }
 
+macro_rules! unary_op {
+  ($v: expr, $w: expr, $op: tt, $t: tt) => {
+    match $w {
+      U64 => ($op($v as u64)) as $t,
+      U32 => ($op($v as u32)) as $t,
+      U16 => ($op($v as u16)) as $t,
+      U8 => ($op($v as u8)) as $t,
+      I64 => ($op($v as i64)) as $t,
+      I32 => ($op($v as i32)) as $t,
+      I16 => ($op($v as i16)) as $t,
+      I8 => ($op($v as i8)) as $t,
+    }
+  };
+}
+
 macro_rules! binary_op {
   ($v1: expr, $v2: expr, $w: expr, $op: tt, $t: tt) => {
     match $w {
@@ -233,8 +248,9 @@ impl ops::Not for Value {
 
   fn not(self) -> Value {
     use Value::*;
+    use Width::*;
     return match self {
-      Integer(v, _) => Value::from(!v),
+      Integer(v, w) => Integer(unary_op!(v, w, !, u64), w),
       Float(v) => Integer((v != 0f64) as u64, Width::U8),
     };
   }
