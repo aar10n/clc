@@ -52,11 +52,9 @@ impl Buffer {
         break;
       }
 
-      println!("parsing line: {}", line);
       let value = Buffer::parse_line(line);
       match value {
         Some(val) => {
-          println!("value: {}", val.to_string());
           entries.push(val);
           count += 1;
         }

@@ -97,7 +97,7 @@ fn main() {
     Ok(value) => value,
     Err(err) => {
       buffer.save();
-      eprint!("{}", err);
+      eprintln!("{}", err);
       process::exit(1);
     }
   };

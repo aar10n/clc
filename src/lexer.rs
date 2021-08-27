@@ -14,6 +14,12 @@ macro_rules! char_at {
   };
 }
 
+macro_rules! is_valid_suffix {
+  ($p: expr, $i: expr) => {
+    ($p[$i] as char) == 'f' && !matches!(char_at!($p, $i + 1), digit_chars!() | ident_chars!())
+  };
+}
+
 macro_rules! bin_chars {
   () => {
     '0'..='1'
@@ -34,6 +40,9 @@ macro_rules! hex_chars {
 }
 macro_rules! ident_chars {
   () => { 'a'..='z' | 'A'..='Z' | '_' };
+}
+macro_rules! ident_chars_rest {
+  () => { 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' };
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +114,7 @@ fn lex_integer_literal(program: &[u8], i: usize, base: u8) -> Result<(Token, usi
     return Err(String::from("Unexpected end of input"));
   }
 
+  let mut cast_float = false;
   let mut j = i;
   while j < program.len() {
     match program[j] as char {
@@ -113,7 +123,12 @@ fn lex_integer_literal(program: &[u8], i: usize, base: u8) -> Result<(Token, usi
       digit_chars!() if base == 10 => j += 1,
       hex_chars!() if base == 16 => j += 1,
       ident_chars!() => {
-        return Err(String::from("Invalid character in integer literal"));
+        if is_valid_suffix!(program, j) && j > i {
+          cast_float = true;
+          break;
+        } else {
+          return Err(String::from("Invalid character in integer literal"));
+        }
       }
       _ => break,
     }
@@ -125,7 +140,13 @@ fn lex_integer_literal(program: &[u8], i: usize, base: u8) -> Result<(Token, usi
 
   let slice = std::str::from_utf8(&program[i..j]).or(Err("Input is not valid utf8"));
   return u64::from_str_radix(slice?, base as u32)
-    .and_then(|res| Ok((Token::Integer(res), j)))
+    .and_then(|res| {
+      if cast_float {
+        Ok((Token::Float(res as f64), j + 1))
+      } else {
+        Ok((Token::Integer(res), j))
+      }
+    })
     .or(Err(String::from("Failed to parse integer literal")));
 }
 
@@ -148,10 +169,6 @@ fn lex_float_literal(program: &[u8], i: usize, j: usize) -> Result<(Token, usize
     }
   }
 
-  if j == k {
-    return Err(String::from("Expected digit in float literal"));
-  }
-
   let slice = std::str::from_utf8(&program[i..k]).or(Err("Input is not valid utf8"));
   return f64::from_str(&slice?)
     .and_then(|res| Ok((Token::Float(res), k)))
@@ -170,13 +187,20 @@ fn lex_numeric_literal(program: &[u8], i: usize) -> Result<(Token, usize), Strin
       .or(Err(String::from("Failed to parse integer literal")));
   }
 
-  let mut period: bool = false;
+  let mut period = false;
   let mut j = i;
   while j < program.len() {
     match program[j] as char {
       digit_chars!() => j += 1,
       ident_chars!() => {
-        return Err(String::from("Invalid character in numeric literal"));
+        if is_valid_suffix!(program, j) {
+          if period {
+            return Err(String::from("Invalid 'f' suffix in float literal"));
+          }
+          break;
+        } else {
+          return Err(String::from("Invalid character in numeric literal"));
+        }
       }
       '.' => {
         j += 1;
@@ -236,15 +260,18 @@ fn lex_reference(program: &[u8], i: usize) -> Result<(Token, usize), String> {
 // Forms an identifier token
 fn lex_identifier(program: &[u8], i: usize) -> Result<(Token, usize), String> {
   // i points to the first character of the identifier
+  let mut first: bool = true;
   let mut j: usize = i;
   while j < program.len() {
     match program[j] as char {
-      ident_chars!() => j += 1,
+      ident_chars!() if first => j += 1,
+      ident_chars_rest!() if !first => j += 1,
       digit_chars!() => {
         return Err(String::from("Invalid character in identifier"));
       }
       _ => break,
     }
+    first = false;
   }
 
   let id = std::str::from_utf8(&program[i..j])
@@ -338,7 +365,9 @@ pub fn tokenize(program: &[u8]) -> Result<Vec<Token>, String> {
 
         if is_unary(op_str) {
           let unary = match tokens.last() {
-            Some(Token::Integer(_)) | Some(Token::Float(_)) | Some(Token::Reference(_)) => false,
+            Some(Token::Integer(_)) | Some(Token::Float(_)) | Some(Token::Reference(_)) | Some(Token::RParen()) => {
+              false
+            }
             _ => true,
           };
 

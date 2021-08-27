@@ -14,22 +14,17 @@ macro_rules! do_cast {
   };
 }
 
-#[rustfmt::skip]
-macro_rules! unary_op {
-  ($v: expr, $w: expr, $op: tt, $t: tt) => {
+macro_rules! unary_call {
+  ($v: expr, $w: expr, $call: ident, $t: tt) => {
     match $w {
-      U64 => ($op($v as u64)) as $t, U32 => ($op($v as u32)) as $t, U16 => ($op($v as u16)) as $t, U8 => ($op($v as u8)) as $t,
-      I64 => ($op($v as i64)) as $t, I32 => ($op($v as i32)) as $t, I16 => ($op($v as i16)) as $t, I8 => ($op($v as i8)) as $t,
-    }
-  };
-}
-
-#[rustfmt::skip]
-macro_rules! unary_op_signed {
-  ($v: expr, $w: expr, $op: tt, $t: tt) => {
-    match $w {
-      U64 => ($op($v as i64)) as $t, U32 => ($op($v as i32)) as $t, U16 => ($op($v as i16)) as $t, U8 => ($op($v as i8)) as $t,
-      I64 => ($op($v as i64)) as $t, I32 => ($op($v as i32)) as $t, I16 => ($op($v as i16)) as $t, I8 => ($op($v as i8)) as $t,
+      U64 => ($v as u64).$call() as $t,
+      U32 => ($v as u32).$call() as $t,
+      U16 => ($v as u16).$call() as $t,
+      U8 => ($v as u8).$call() as $t,
+      I64 => ($v as i64).$call() as $t,
+      I32 => ($v as i32).$call() as $t,
+      I16 => ($v as i16).$call() as $t,
+      I8 => ($v as i8).$call() as $t,
     }
   };
 }
@@ -43,7 +38,23 @@ macro_rules! binary_op {
       I64 => (($v1 as i64) $op ($v2 as i64)) as $t, I32 => (($v1 as i32) $op ($v2 as i32)) as $t,
       I16 => (($v1 as i16) $op ($v2 as i16)) as $t, I8 => (($v1 as i8) $op ($v2 as i8)) as $t,
     }
-  }
+  };
+}
+
+macro_rules! binary_call {
+  ($v1: expr, $v2: expr, $w: expr, $call: ident, $t: tt) => {
+    match $w {
+      U64 => (($v1 as u64).$call($v2 as u64)) as $t,
+      U32 => (($v1 as u32).$call($v2 as u32)) as $t,
+      U16 => (($v1 as u16).$call($v2 as u16)) as $t,
+      U8 => (($v1 as u8).$call($v2 as u8)) as $t,
+
+      I64 => (($v1 as i64).$call($v2 as i64)) as $t,
+      I32 => (($v1 as i32).$call($v2 as i32)) as $t,
+      I16 => (($v1 as i16).$call($v2 as i16)) as $t,
+      I8 => (($v1 as i8).$call($v2 as i8)) as $t,
+    }
+  };
 }
 
 #[rustfmt::skip]
@@ -72,46 +83,49 @@ macro_rules! value_fmt {
   };
 }
 
-macro_rules! unary_int_op {
-  ($v: expr, $w: expr, $op: tt) => {
-    unary_op!($v, $w, $op, u64)
-  };
-}
-macro_rules! unary_signed_int_op {
-  ($v: expr, $w: expr, $op: tt) => {
-    unary_op_signed!($v, $w, $op, u64)
-  };
-}
 macro_rules! binary_int_op {
   ($v1: expr, $v2: expr, $w: expr, $op: tt) => {
     binary_op!($v1, $v2, $w, $op, u64)
   };
 }
 
+macro_rules! impl_unary_op {
+  ($ops: tt, $func: tt, $call: ident, $op: tt) => {
+    impl ops::$ops for Value {
+      type Output = Value;
+
+      fn $func(self) -> Value {
+        use Value::*;
+        use Width::*;
+        return match self {
+          Integer(v, w) => Integer(unary_call!(v, w, $call, u64), w),
+          Float(v) => Float($op v),
+        };
+      }
+    }
+  };
+}
+
 macro_rules! impl_arithmetic_op {
-  ($ops: tt, $func: tt, $op: tt) => {
+  ($ops: tt, $func: tt, $call: ident, $op: tt) => {
     impl ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
         use Value::*;
         use Width::*;
         return match self {
-          Integer(v1, w) => {
-            match rhs {
-              Integer(v2, _) => { Integer(binary_int_op!(v1, v2, w, $op), w) },
-              Float(v2) => { Integer(binary_int_op!(v1, v2, w, $op), w) },
-            }
+          Integer(v1, w) => match rhs {
+            Integer(v2, _) => Integer(binary_call!(v1, v2, w, $call, u64), w),
+            Float(v2) => Integer(binary_call!(v1, v2, w, $call, u64), w),
           },
-          Float(v1) => {
-            match rhs {
-              Integer(v2, _) => { Float(v1 $op (v2 as f64)) },
-              Float(v2) => { Float(v1 $op v2) }
-            }
-          }
-        }
+          Float(v1) => match rhs {
+            Integer(v2, _) => Float(v1 $op (v2 as f64)),
+            Float(v2) => Float(v1 $op v2),
+          },
+        };
       }
     }
-  }
+  };
 }
 
 macro_rules! impl_bitwise_op {
@@ -122,22 +136,18 @@ macro_rules! impl_bitwise_op {
         use Value::*;
         use Width::*;
         return match self {
-          Integer(v1, w) => {
-            match rhs {
-              Integer(v2, _) => { Integer(binary_int_op!(v1, v2, w, $op), w) },
-              Float(v2) => { Integer(binary_int_op!(v1, (v2 as u64), w, $op), w) },
-            }
+          Integer(v1, w) => match rhs {
+            Integer(v2, _) => Integer(binary_int_op!(v1, v2, w, $op), w),
+            Float(v2) => Integer(binary_int_op!(v1, (v2 as u64), w, $op), w),
           },
-          Float(v1) => {
-            match rhs {
-              Integer(v2, w) => { Integer(binary_int_op!((v1 as u64), (v2 as u64), w, $op), Width::U64) },
-              Float(v2) => { Integer((v1 as u64) $op (v2 as u64), Width::U64) },
-            }
-          }
-        }
+          Float(_) => match rhs {
+            Integer(_, _) => Float(f64::NAN),
+            Float(_) => Float(f64::NAN),
+          },
+        };
       }
     }
-  }
+  };
 }
 
 macro_rules! impl_from {
@@ -194,11 +204,11 @@ pub enum Value {
   Float(f64),
 }
 
-impl_arithmetic_op!(Add, add, +);
-impl_arithmetic_op!(Sub, sub, -);
-impl_arithmetic_op!(Mul, mul, *);
-impl_arithmetic_op!(Div, div, /);
-impl_arithmetic_op!(Rem, rem, %);
+impl_arithmetic_op!(Add, add, wrapping_add, +);
+impl_arithmetic_op!(Sub, sub, wrapping_sub, -);
+impl_arithmetic_op!(Mul, mul, wrapping_mul, *);
+impl_arithmetic_op!(Div, div, wrapping_div, /);
+impl_arithmetic_op!(Rem, rem, wrapping_rem, %);
 
 impl_bitwise_op!(BitAnd, bitand, &);
 impl_bitwise_op!(BitOr, bitor, |);
@@ -206,27 +216,14 @@ impl_bitwise_op!(BitXor, bitxor, ^);
 impl_bitwise_op!(Shl, shl, <<);
 impl_bitwise_op!(Shr, shr, >>);
 
-impl ops::Neg for Value {
-  type Output = Value;
-
-  fn neg(self) -> Value {
-    use Value::*;
-    use Width::*;
-    return match self {
-      Integer(v, w) => Integer(unary_signed_int_op!(v, w, -), w),
-      Float(v) => Float(-v),
-    };
-  }
-}
-
+impl_unary_op!(Neg, neg, wrapping_neg, -);
 impl ops::Not for Value {
   type Output = Value;
 
   fn not(self) -> Value {
     use Value::*;
-    use Width::*;
     return match self {
-      Integer(v, w) => Integer(unary_int_op!(v, w, !), w),
+      Integer(v, _) => Value::from(!v),
       Float(v) => Integer((v != 0f64) as u64, Width::U8),
     };
   }
@@ -317,27 +314,6 @@ impl From<Value> for bool {
   }
 }
 
-impl Value {
-  pub fn to_signed(&self) -> Value {
-    use Value::*;
-    use Width::*;
-    match self {
-      Integer(v, w) => {
-        let new_width = match w {
-          U64 => I64,
-          U32 => I64,
-          U16 => I16,
-          U8 => I8,
-          _ => *w,
-        };
-
-        Integer(*v, new_width)
-      }
-      Float(v) => Float(*v),
-    }
-  }
-}
-
 //
 
 impl Width {
@@ -376,7 +352,7 @@ impl Value {
   pub fn as_typed_string(&self) -> String {
     use Value::*;
     match self {
-      Integer(v, w) => format!("{} {}", w.as_string(), self.as_string()),
+      Integer(_, w) => format!("{} {}", w.as_string(), self.as_string()),
       Float(v) => format!("f64 {}", v),
     }
   }
@@ -385,5 +361,56 @@ impl Value {
 impl Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.as_string())
+  }
+}
+
+//
+
+impl Value {
+  pub fn is_signed(&self) -> bool {
+    use Value::*;
+    use Width::*;
+    match self {
+      Integer(_, w) => match w {
+        U64 | U32 | U16 | U8 => false,
+        _ => true,
+      },
+      Float(_) => true,
+    }
+  }
+
+  pub fn to_signed(&self) -> Value {
+    use Value::*;
+    use Width::*;
+    match self {
+      Integer(v, w) => {
+        let new_width = match w {
+          U64 => I64,
+          U32 => I64,
+          U16 => I16,
+          U8 => I8,
+          _ => *w,
+        };
+
+        Integer(*v, new_width)
+      }
+      Float(v) => Float(*v),
+    }
+  }
+}
+
+//
+
+impl Value {
+  pub fn abs(&self) -> Value {
+    if self.is_signed() {
+      if *self < Value::from(0u64) {
+        -*self
+      } else {
+        *self
+      }
+    } else {
+      *self
+    }
   }
 }

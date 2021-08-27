@@ -20,16 +20,7 @@ fn process_tokens(tokens: &Vec<Token>, buffer: &Buffer) -> Result<Vec<Token>, St
         out_tokens.push(Token::Value(token.as_value().unwrap()));
         continue;
       }
-      Token::BinaryOp(op) => {
-        // if op == "-" {
-        //   // transform 'x - y' into 'x + -y'
-        //   let unary_minus = Token::UnaryOp(String::from("-u"));
-        //   let binary_plus = Token::BinaryOp(String::from("+"));
-        //   out_tokens.push(conv_op_token(&binary_plus));
-        //   out_tokens.push(conv_op_token(&unary_minus));
-        // } else {
-        //   out_tokens.push(conv_op_token(token));
-        // }
+      Token::BinaryOp(_) => {
         out_tokens.push(conv_op_token(token));
         continue;
       }
