@@ -70,15 +70,6 @@ impl Buffer {
     })
   }
 
-  pub fn create_empty(max_size: usize) -> Buffer {
-    Buffer {
-      filename: None,
-      contents: vec![],
-      max_size,
-      size: 0,
-    }
-  }
-
   pub fn get(&self, i: usize) -> Value {
     if i > self.size {
       return Value::Integer(0, Width::U64);

@@ -84,7 +84,7 @@ fn eval_expression(tokens: &Vec<&Token>) -> Result<Value, String> {
         let arg = stack.pop().unwrap();
         args -= 1;
         let res = func(arg);
-        println!("{} | {:?} -> {:?}", name, arg, res);
+        // println!("{} | {:?} -> {:?}", name, arg, res);
         stack.push(res);
         args += 1;
       }
@@ -97,7 +97,7 @@ fn eval_expression(tokens: &Vec<&Token>) -> Result<Value, String> {
         let arg1 = stack.pop().unwrap();
         args -= 2;
         let res = func(arg1, arg2);
-        println!("{} | {:?} {:?} -> {:?}", name, arg1, arg2, res);
+        // println!("{} | {:?} {:?} -> {:?}", name, arg1, arg2, res);
         stack.push(res);
         args += 1;
       }
@@ -121,12 +121,12 @@ pub fn parse(tokens: &Vec<Token>, buffer: &mut Buffer) -> Result<Value, String> 
   let mut output: Vec<&'_ Token> = vec![];
   let mut values: Vec<Value> = vec![];
 
-  println!("--- tokens ---");
-  println!("{:?}", tokens);
+  // println!("--- tokens ---");
+  // println!("{:?}", tokens);
 
   let toks = process_tokens(tokens, buffer)?;
-  println!("--- processed ---");
-  println!("{:?}", toks);
+  // println!("--- processed ---");
+  // println!("{:?}", toks);
 
   // convert expression to rpn
   for token in toks.iter() {
@@ -187,12 +187,12 @@ pub fn parse(tokens: &Vec<Token>, buffer: &mut Buffer) -> Result<Value, String> 
           }
         }
 
-        println!("--- output ---");
-        println!("{:?}", output);
-        println!("--- evaluating ---");
+        // println!("--- output ---");
+        // println!("{:?}", output);
+        // println!("--- evaluating ---");
         let value = eval_expression(&output)?;
-        println!("--- value ---");
-        println!("{:?}", value);
+        // println!("--- value ---");
+        // println!("{:?}", value);
         values.push(value);
         buffer.add(value);
       }

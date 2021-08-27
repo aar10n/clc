@@ -8,6 +8,7 @@ mod value;
 use crate::buffer::Buffer;
 use crate::lexer::tokenize;
 use crate::parser::parse;
+use crate::value::Format;
 use clap::Clap;
 use std::env;
 use std::fs::File;
@@ -37,6 +38,10 @@ pub struct Opts {
   /// Expression to evaluate
   #[clap(short, long = "expr", conflicts_with = "file")]
   expression: Option<String>,
+
+  /// Output format [all|bin|hex|oct|alfred]
+  #[clap(short = 'o')]
+  format: Option<String>,
 }
 
 fn read_program(opts: &Opts) -> String {
@@ -68,7 +73,23 @@ fn read_program(opts: &Opts) -> String {
 }
 
 fn main() {
+  let mut format = Format::Default;
   let mut opts = Opts::parse();
+  if opts.format.is_some() {
+    let fmt = opts.format.clone().unwrap();
+    format = match fmt.as_str() {
+      "all" => Format::All,
+      "bin" => Format::Binary,
+      "hex" => Format::Hex,
+      "oct" => Format::Octal,
+      "alfred" => Format::Alfred,
+      _ => {
+        eprint!("bad output format: {}", fmt);
+        process::exit(1);
+      }
+    }
+  }
+
   let home = env::var("HOME").map_or(String::from(""), |p| p);
   if opts.buffer_file.is_none() {
     opts.buffer_file = Some(String::from(Path::new(&home).join(BUFFER_FILE).to_str().unwrap()));
@@ -83,8 +104,8 @@ fn main() {
   };
 
   let program = read_program(&opts);
-  println!("{:?}", opts);
-  println!("{}", program);
+  // println!("{:?}", opts);
+  // println!("{}", program);
   let tokens = match tokenize(program.as_bytes()) {
     Ok(tokens) => tokens,
     Err(err) => {
@@ -103,5 +124,5 @@ fn main() {
   };
 
   buffer.save();
-  println!("{}", result.as_string());
+  println!("{}", result.as_format_string(format));
 }

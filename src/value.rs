@@ -72,13 +72,13 @@ macro_rules! cmp {
 
 #[rustfmt::skip]
 macro_rules! value_fmt {
-  ($v: expr, $w: expr) => {
+  ($v: expr, $w: expr, $f: expr) => {
     match $w {
-      U64 => format!("{}", $v as u64), U32 => format!("{}", $v as u32), 
-      U16 => format!("{}", $v as u16), U8 => format!("{}", $v as u8),
+      U64 => format!($f, $v as u64), U32 => format!($f, $v as u32), 
+      U16 => format!($f, $v as u16), U8 => format!($f, $v as u8),
 
-      I64 => format!("{}", $v as i64), I32 => format!("{}", $v as i32),
-      I16 => format!("{}", $v as i16), I8 => format!("{}", $v as i8),
+      I64 => format!($f, $v as i64), I32 => format!($f, $v as i32),
+      I16 => format!($f, $v as i16), I8 => format!($f, $v as i8),
     }
   };
 }
@@ -184,6 +184,16 @@ macro_rules! impl_from_value {
 //
 //
 //
+
+#[derive(Clone, Copy)]
+pub enum Format {
+  Default,
+  All,
+  Alfred,
+  Binary,
+  Hex,
+  Octal,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Width {
@@ -344,7 +354,32 @@ impl Value {
     use Value::*;
     use Width::*;
     match self {
-      Integer(v, w) => value_fmt!(*v, w),
+      Integer(v, w) => value_fmt!(*v, w, "{}"),
+      Float(v) => format!("{}", v),
+    }
+  }
+
+  pub fn as_format_string(&self, format: Format) -> String {
+    use Format::*;
+    use Value::*;
+    use Width::*;
+    match self {
+      Integer(v, w) => match format {
+        Default => value_fmt!(*v, w, "{}"),
+        All => {
+          format!(
+            "{}\n{}\n{}\n{}",
+            value_fmt!(*v, w, "{}"),
+            value_fmt!(*v, w, "{:#x}"),
+            value_fmt!(*v, w, "{:#o}"),
+            value_fmt!(*v, w, "{:#b}"),
+          )
+        }
+        Alfred => generate_alfred_output(*self),
+        Binary => value_fmt!(*v, w, "{:#b}"),
+        Hex => value_fmt!(*v, w, "{:#x}"),
+        Octal => value_fmt!(*v, w, "{:#o}"),
+      },
       Float(v) => format!("{}", v),
     }
   }
@@ -411,6 +446,70 @@ impl Value {
       }
     } else {
       *self
+    }
+  }
+}
+
+// Alfred workflow xml output
+fn generate_alfred_output(value: Value) -> String {
+  use Value::*;
+  match value {
+    Integer(_, _) => {
+      let expr = value.as_format_string(Format::Default);
+      let expr_hex = value.as_format_string(Format::Hex);
+      let expr_oct = value.as_format_string(Format::Octal);
+      let expr_bin = value.as_format_string(Format::Binary);
+      format!(
+        "
+<?xml version=\"1.0\"?>
+<items>
+  <item arg=\"{expr}\" valid=\"YES\" autocomplete=\"{expr}\" type=\"default\">
+    <title>{expr}</title>
+    <subtitle>copy+paste as \"{expr}\"</subtitle>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{expr}&quot;\" valid=\"yes\" arg=\"{expr}\"/>
+    <icon>dec.png</icon>
+  </item>
+  <item arg=\"{hexstr}\" valid=\"YES\" autocomplete=\"{hexstr}\" type=\"default\">
+    <title>{hexstr}</title>
+    <subtitle>copy+paste as \"{hexstr}\"</subtitle>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{hexstr}&quot;\" valid=\"yes\" arg=\"{hexstr}\"/>
+    <icon>hex.png</icon>
+  </item>
+  <item arg=\"{octstr}\" valid=\"YES\" autocomplete=\"{octstr}\" type=\"default\">
+    <title>{octstr}</title>
+    <subtitle>copy+paste as \"{octstr}\"</subtitle>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{octstr}&quot;\" valid=\"yes\" arg=\"{octstr}\"/>
+    <icon>oct.png</icon>
+  </item>
+  <item arg=\"{binstr}\" valid=\"YES\" autocomplete=\"{binstr}\" type=\"default\">
+    <title>{binstr}</title>
+    <subtitle>copy+paste as \"{binstr}\"</subtitle>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{binstr}&quot;\" valid=\"yes\" arg=\"{binstr}\"/>
+    <icon>bin.png</icon>
+  </item>
+</items>",
+        expr = expr,
+        hexstr = expr_hex,
+        octstr = expr_oct,
+        binstr = expr_bin,
+      )
+    }
+    Float(v) => {
+      format!(
+        "\
+<?xml version=\"1.0\"?>
+<items>
+  <item arg=\"{expr}\" valid=\"YES\" autocomplete=\"{pretty_dec}\" type=\"default\">
+    <title>{pretty_dec}</title>
+    <subtitle>copy+paste as \"{expr}\"</subtitle>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{pretty_dec}&quot;\" valid=\"yes\" arg=\"{pretty_dec}\"/>
+    <icon>dec.png</icon>
+  </item>
+</items>
+",
+        expr = v,
+        pretty_dec = v
+      )
     }
   }
 }
