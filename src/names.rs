@@ -1,14 +1,13 @@
-use crate::value::{Value};
+use crate::value::Value;
 use phf::phf_map;
 
 #[derive(Debug, Clone)]
 pub enum Name {
   Constant(fn() -> Value),
-  Function(fn(Value) -> Value)
+  Function(fn(Value) -> Value),
 }
 
 use Name::*;
-use crate::value::Value::Float;
 
 const IDENTIFIER_TABLE: phf::Map<&'static str, Name> = phf_map! {
   // Constants

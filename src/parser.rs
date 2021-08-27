@@ -1,145 +1,154 @@
-use crate::value::{Value};
-use crate::names::{Name};
+use crate::buffer::Buffer;
 use crate::lexer::Token;
-use crate::names::get_name;
-use crate::lexer::Token::Function;
-use std::slice::{Iter};
-use phf::phf_map;
-use std::borrow::{Borrow, BorrowMut};
-
-#[derive(Copy, Clone)]
-pub enum Assoc {
-  Left,
-  Right
-}
-
-pub const LONGEST_OPERATOR: usize = 2;
-pub const OPERATORS: &[&str] = &[
-  "+", "-", "*", "/", "%",
-  "==", "!=", ">", "<", ">=", "<=",
-  "&", "|", "^", "<<", ">>",
-  "&&", "||",
-  "~", "!",
-];
-
-const PRECEDENCE_TABLE: phf::Map<&'static str, (i32, Assoc)> = phf_map! {
-  "+u" => (11, Assoc::Right), // unary plus
-  "-u" => (11, Assoc::Right), // unary minus
-  "!u" => (10, Assoc::Right), // logical not
-  "~u" => (10, Assoc::Right), // bitwise not
-
-  "*" => (9, Assoc::Left),   // multiplication
-  "/" => (9, Assoc::Left),   // division
-  "%" => (9, Assoc::Left),   // modulo
-
-  "+" => (8, Assoc::Left),   // addition
-  "-" => (8, Assoc::Left),   // subtraction
-
-  "<<" => (7, Assoc::Left),  // bitwise left shift
-  ">>" => (7, Assoc::Left),  // bitwise right shift
-
-  ">" => (6, Assoc::Left),   // greater than
-  "<" => (6, Assoc::Left),   // less than
-  ">=" => (6, Assoc::Left),  // greater than or equal to
-  "<=" => (6, Assoc::Left),  // greater than or equal to
-  "==" => (5, Assoc::Left),  // equal to
-  "!=" => (5, Assoc::Left),  // not equal to
-
-  "&" => (4, Assoc::Left),   // bitwise and
-  "^" => (3, Assoc::Left),   // bitwise xor
-  "|" => (2, Assoc::Left),   // bitwise or
-
-  "&&" => (1, Assoc::Left),  // logical and
-  "||" => (1, Assoc::Left),  // logical or
-
-  "(" => (0, Assoc::Right),   // parentheses
-};
+use crate::names::{get_name, Name};
+use crate::operators::{conv_op_token, Assoc};
+use crate::value::{Value, Width};
 
 //
 
-pub fn is_unary(s: &str) -> bool {
-  let us = format!("{}u", s);
-  return PRECEDENCE_TABLE.get(us.as_str()).is_some();
-}
-
-pub fn get_prec(s: &str) -> i32 {
-  return match PRECEDENCE_TABLE.get(s) {
-    Some((prec, _)) => *prec,
-    None => -1,
-  }
-}
-
-pub fn get_assoc(s: &str) -> Assoc {
-  return match PRECEDENCE_TABLE.get(s) {
-    Some((_, assoc)) => *assoc,
-    None => Assoc::Left,
-  }
-}
-
-//
-
-//
-fn process_tokens<'a>(tokens: &Vec<Token>) -> Result<Vec<Token>, String> {
-  use Token::*;
-  let mut out_tokens: Vec<Token> = vec!();
-
+fn process_tokens(tokens: &Vec<Token>, buffer: &Buffer) -> Result<Vec<Token>, String> {
+  let mut out_tokens: Vec<Token> = vec![];
+  let mut nl_count = 0;
   for token in tokens.iter() {
     match token {
-      Integer(_) | Float(_) => {
-        out_tokens.push(Value(token.as_value().unwrap()));
+      Token::Newline() => nl_count += 1,
+      _ => nl_count = 0,
+    }
+
+    match token {
+      Token::Integer(_) | Token::Float(_) => {
+        out_tokens.push(Token::Value(token.as_value().unwrap()));
         continue;
-      },
-      UnaryOp(op) => {
+      }
+      Token::BinaryOp(op) => {
+        // if op == "-" {
+        //   // transform 'x - y' into 'x + -y'
+        //   let unary_minus = Token::UnaryOp(String::from("-u"));
+        //   let binary_plus = Token::BinaryOp(String::from("+"));
+        //   out_tokens.push(conv_op_token(&binary_plus));
+        //   out_tokens.push(conv_op_token(&unary_minus));
+        // } else {
+        //   out_tokens.push(conv_op_token(token));
+        // }
+        out_tokens.push(conv_op_token(token));
+        continue;
+      }
+      Token::UnaryOp(op) => {
         if op == "+u" {
           // ignore unary +
           continue;
         }
-      },
-      Identifier(id) => {
+        out_tokens.push(conv_op_token(token));
+        continue;
+      }
+      Token::Reference(num) => {
+        let val = buffer.get(*num as usize);
+        out_tokens.push(Token::Value(val));
+        continue;
+      }
+      Token::Identifier(id) => {
         let name = get_name(id);
         if name.is_none() {
-          return Err(format!("Unknown name '{}'", id))
+          return Err(format!("Unknown name '{}'", id));
         }
-
 
         match name.unwrap() {
-          Name::Constant(val) => out_tokens.push(Value(val())),
-          Name::Function(func) => out_tokens.push(Function(id.clone(), func))
+          Name::Constant(val) => out_tokens.push(Token::Value(val())),
+          Name::Function(func) => out_tokens.push(Token::UnaryFunction(id.clone(), func)),
         }
         continue;
-      },
+      }
+      Token::Newline() => {
+        if nl_count > 1 {
+          // ignore extra newlines
+          continue;
+        }
+      }
       _ => (),
     }
     out_tokens.push(token.clone());
   }
 
+  if out_tokens.last().map_or(false, |v| !matches!(v, Token::Newline())) {
+    out_tokens.push(Token::Newline());
+  }
   return Ok(out_tokens);
 }
 
-pub fn parse(tokens: &Vec<Token>) -> Result<Value, String> {
-  use Token::*;
+fn eval_expression(tokens: &Vec<&Token>) -> Result<Value, String> {
+  // expects the expression in rpn form
+  let mut stack: Vec<Value> = vec![];
+  let mut args: i32 = 0;
+  for token in tokens.iter() {
+    match token {
+      Token::Value(v) => {
+        stack.push(*v);
+        args += 1;
+      }
+      Token::UnaryFunction(name, func) => {
+        if args < 1 {
+          return Err(format!("Expected one argument to {}", name));
+        }
 
-  let mut op_stack: Vec<&'_ Token> = vec!();
-  let mut output: Vec<&'_ Token> = vec!();
+        let arg = stack.pop().unwrap();
+        args -= 1;
+        let res = func(arg);
+        println!("{} | {:?} -> {:?}", name, arg, res);
+        stack.push(res);
+        args += 1;
+      }
+      Token::BinaryFunction(name, func) => {
+        if args < 2 {
+          return Err(format!("Expected two arguments to {}", name));
+        }
+
+        let arg2 = stack.pop().unwrap();
+        let arg1 = stack.pop().unwrap();
+        args -= 2;
+        let res = func(arg1, arg2);
+        println!("{} | {:?} {:?} -> {:?}", name, arg1, arg2, res);
+        stack.push(res);
+        args += 1;
+      }
+      _ => panic!("unexpected token"),
+    }
+  }
+
+  if stack.len() != 1 {
+    eprintln!("stack: {:?}", stack);
+    panic!("unexpected stack state");
+  }
+
+  let value = stack.pop().unwrap();
+  return Ok(value);
+}
+
+//
+
+pub fn parse(tokens: &Vec<Token>, buffer: &mut Buffer) -> Result<Value, String> {
+  let mut op_stack: Vec<&'_ Token> = vec![];
+  let mut output: Vec<&'_ Token> = vec![];
+  let mut values: Vec<Value> = vec![];
 
   println!("--- tokens ---");
   println!("{:?}", tokens);
 
-  let toks = process_tokens(tokens)?;
+  let toks = process_tokens(tokens, buffer)?;
   println!("--- processed ---");
   println!("{:?}", toks);
 
+  // convert expression to rpn
   for token in toks.iter() {
     match token {
-      Value(_) => {
+      Token::Value(_) => {
         output.push(token);
-      },
-      Function(_, _) => {
+      }
+      Token::UnaryFunction(_, _) => {
         op_stack.push(token);
-      },
-      BinaryOp(_) | UnaryOp(_) => {
+      }
+      Token::BinaryFunction(_, _) => {
         while !op_stack.is_empty() {
-          let op = op_stack.last().unwrap().borrow_mut();
+          let op = *op_stack.last().unwrap();
           if op.prec() >= token.prec() && matches!(token.assoc(), Assoc::Left) {
             op_stack.pop();
             output.push(op);
@@ -148,55 +157,61 @@ pub fn parse(tokens: &Vec<Token>) -> Result<Value, String> {
           }
         }
         op_stack.push(token);
-      },
-      LParen() => {
+      }
+      Token::LParen() => {
         op_stack.push(token);
-      },
-      RParen() => {
+      }
+      Token::RParen() => {
         while !op_stack.is_empty() {
-          let op = op_stack.last().unwrap();
-          if matches!(op, LParen()) {
+          let op = *op_stack.last().unwrap();
+          if matches!(op, Token::LParen()) {
             break;
           }
-          // op_stack.pop();
-          op_stack.remove(op_stack.len() - 1);
+          op_stack.pop();
           output.push(op);
         }
 
-        if op_stack.is_empty() || !matches!(op_stack.last().unwrap(), LParen()) {
+        if op_stack.is_empty() || !matches!(op_stack.last().unwrap(), Token::LParen()) {
           return Err(String::from("Encountered ')' without matching '('"));
         }
-        // op_stack.pop();
-        op_stack.remove(op_stack.len() - 1);
+        op_stack.pop();
 
-        if op_stack.last().map_or(false, |t| matches!(t, Function(_, _))) {
-          let func = op_stack.last().unwrap();
-          op_stack.remove(op_stack.len() - 1);
+        if op_stack.last().map_or(false, |t| {
+          matches!(t, Token::UnaryFunction(_, _)) || matches!(t, Token::BinaryFunction(_, _))
+        }) {
+          let func = *op_stack.last().unwrap();
+          op_stack.pop();
           output.push(func);
         }
       }
-      Newline() => {
+      Token::Newline() => {
         while !op_stack.is_empty() {
-          let op = op_stack.last().unwrap();
+          let op = *op_stack.last().unwrap();
           match op {
-            LParen() => {
-              return Err(String::from("Unmatched ')'"))
-            },
+            Token::LParen() => return Err(String::from("Unmatched ')'")),
             _ => {
-              // op_stack.pop();
-              op_stack.remove(op_stack.len() - 1);
+              op_stack.pop();
               output.push(op);
             }
           }
         }
 
-        println!("Line parsing done");
+        println!("--- output ---");
+        println!("{:?}", output);
+        println!("--- evaluating ---");
+        let value = eval_expression(&output)?;
+        println!("--- value ---");
+        println!("{:?}", value);
+        values.push(value);
+        buffer.add(value);
       }
-      _ => panic!("unexpected token")
+      _ => panic!("unexpected token {:?}", token),
     }
   }
 
-  println!("--- output ---");
-  println!("{:?}", output);
-  return Ok(crate::value::Value::Float(3.14));
+  let last = values.last();
+  if last.is_some() {
+    return Ok(*last.unwrap());
+  }
+  return Ok(Value::Integer(0, Width::U64));
 }

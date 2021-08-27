@@ -1,24 +1,33 @@
-use crate::parser::{Assoc, OPERATORS, LONGEST_OPERATOR, is_unary, get_prec, get_assoc};
+use crate::operators::{get_assoc, get_prec, is_unary, Assoc, LONGEST_OPERATOR, OPERATORS};
 use crate::value::{Value, Width};
-use crate::names::{Name};
+use regex::Regex;
 use std::cmp::min;
 use std::str::FromStr;
-use regex::{Regex, Match};
 
 macro_rules! char_at {
   ($p: expr, $i: expr) => {
-    if $i < $p.len() { $p[$i] as char } else { '\0' as char }
+    if $i < $p.len() {
+      $p[$i] as char
+    } else {
+      '\0' as char
+    }
   };
 }
 
 macro_rules! bin_chars {
-  () => { '0'..='1' };
+  () => {
+    '0'..='1'
+  };
 }
 macro_rules! oct_chars {
-  () => { '0'..='7' };
+  () => {
+    '0'..='7'
+  };
 }
 macro_rules! digit_chars {
-  () => { '0'..='9' };
+  () => {
+    '0'..='9'
+  };
 }
 macro_rules! hex_chars {
   () => { '0'..='9' | 'a'..='f' | 'A'..='F' }
@@ -42,13 +51,15 @@ pub enum Token {
 
   // intermediate tokens
   Value(Value),
-  Function(String, fn(Value) -> Value),
+  UnaryFunction(String, fn(Value) -> Value),
+  BinaryFunction(String, fn(Value, Value) -> Value),
 }
 
 impl Token {
   pub fn prec(&self) -> i32 {
     use Token::*;
     match self {
+      UnaryFunction(str, _) | BinaryFunction(str, _) => get_prec(str),
       UnaryOp(str) | BinaryOp(str) => get_prec(str),
       _ => -1,
     }
@@ -57,6 +68,7 @@ impl Token {
   pub fn assoc(&self) -> Assoc {
     use Token::*;
     match self {
+      UnaryFunction(str, _) | BinaryFunction(str, _) => get_assoc(str),
       UnaryOp(str) | BinaryOp(str) => get_assoc(str),
       _ => Assoc::Left,
     }
@@ -71,13 +83,12 @@ impl Token {
   }
 }
 
-
 fn get_op_regex() -> Regex {
   let mut operators: Vec<String> = OPERATORS
-      .to_vec()
-      .iter()
-      .map(|s| String::from(regex::escape(s)))
-      .collect();
+    .to_vec()
+    .iter()
+    .map(|s| String::from(regex::escape(s)))
+    .collect();
 
   operators.sort_by(|a, b| b.len().cmp(&a.len()));
   let pattern: String = format!("^({})", operators.join("|"));
@@ -103,7 +114,7 @@ fn lex_integer_literal(program: &[u8], i: usize, base: u8) -> Result<(Token, usi
       hex_chars!() if base == 16 => j += 1,
       ident_chars!() => {
         return Err(String::from("Invalid character in integer literal"));
-      },
+      }
       _ => break,
     }
   }
@@ -112,11 +123,10 @@ fn lex_integer_literal(program: &[u8], i: usize, base: u8) -> Result<(Token, usi
     return Err(String::from("Expected digit in integer literal"));
   }
 
-  let slice = std::str::from_utf8(&program[i..j])
-      .or(Err("Input is not valid utf8"));
+  let slice = std::str::from_utf8(&program[i..j]).or(Err("Input is not valid utf8"));
   return u64::from_str_radix(slice?, base as u32)
-      .and_then(|res| Ok((Token::Integer(res), j)))
-      .or(Err(String::from("Failed to parse integer literal")));
+    .and_then(|res| Ok((Token::Integer(res), j)))
+    .or(Err(String::from("Failed to parse integer literal")));
 }
 
 // Forms a float token
@@ -142,11 +152,10 @@ fn lex_float_literal(program: &[u8], i: usize, j: usize) -> Result<(Token, usize
     return Err(String::from("Expected digit in float literal"));
   }
 
-  let slice = std::str::from_utf8(&program[i..k])
-      .or(Err("Input is not valid utf8"));
+  let slice = std::str::from_utf8(&program[i..k]).or(Err("Input is not valid utf8"));
   return f64::from_str(&slice?)
-      .and_then(|res| Ok((Token::Float(res), k)))
-      .or(Err(String::from("Failed to parse float literal")));
+    .and_then(|res| Ok((Token::Float(res), k)))
+    .or(Err(String::from("Failed to parse float literal")));
 }
 
 // Forms an integer or float token
@@ -155,11 +164,10 @@ fn lex_numeric_literal(program: &[u8], i: usize) -> Result<(Token, usize), Strin
   // of decimal integers and floating point values
   if i == program.len() - 1 {
     // only a single digit
-    let slice = std::str::from_utf8(&program[i..])
-        .or(Err("Input is not valid utf8"));
+    let slice = std::str::from_utf8(&program[i..]).or(Err("Input is not valid utf8"));
     return u64::from_str(slice?)
-        .and_then(|res| Ok((Token::Integer(res), i + 1)))
-        .or(Err(String::from("Failed to parse integer literal")));
+      .and_then(|res| Ok((Token::Integer(res), i + 1)))
+      .or(Err(String::from("Failed to parse integer literal")));
   }
 
   let mut period: bool = false;
@@ -169,12 +177,12 @@ fn lex_numeric_literal(program: &[u8], i: usize) -> Result<(Token, usize), Strin
       digit_chars!() => j += 1,
       ident_chars!() => {
         return Err(String::from("Invalid character in numeric literal"));
-      },
+      }
       '.' => {
         j += 1;
         period = true;
         break;
-      },
+      }
       _ => break,
     }
   }
@@ -193,10 +201,9 @@ fn lex_reference(program: &[u8], i: usize) -> Result<(Token, usize), String> {
   }
 
   let mut zero = false;
-  let mut start = true;
   let mut j = i;
   while j < program.len() {
-    if zero && start {
+    if zero && (program[j] as char) == '0' {
       return Err(String::from("Invalid reference"));
     }
 
@@ -204,15 +211,14 @@ fn lex_reference(program: &[u8], i: usize) -> Result<(Token, usize), String> {
       '0' => {
         j += 1;
         zero = true;
-      },
+      }
       digit_chars!() => {
         j += 1;
         zero = false;
-        start = false;
-      },
+      }
       ident_chars!() => {
         return Err(String::from("Invalid character in reference"));
-      },
+      }
       _ => break,
     }
   }
@@ -221,11 +227,10 @@ fn lex_reference(program: &[u8], i: usize) -> Result<(Token, usize), String> {
     return Err(String::from("Invalid reference"));
   }
 
-  let slice = std::str::from_utf8(&program[i..j])
-      .or(Err("Input is not valid utf8"));
+  let slice = std::str::from_utf8(&program[i..j]).or(Err("Input is not valid utf8"));
   return u64::from_str(slice?)
-      .and_then(|res| Ok((Token::Reference(res), j)))
-      .or(Err(String::from("Failed to parse reference")));
+    .and_then(|res| Ok((Token::Reference(res), j)))
+    .or(Err(String::from("Failed to parse reference")));
 }
 
 // Forms an identifier token
@@ -237,14 +242,14 @@ fn lex_identifier(program: &[u8], i: usize) -> Result<(Token, usize), String> {
       ident_chars!() => j += 1,
       digit_chars!() => {
         return Err(String::from("Invalid character in identifier"));
-      },
+      }
       _ => break,
     }
   }
 
   let id = std::str::from_utf8(&program[i..j])
-      .and_then(|s| Ok(String::from(s)))
-      .or(Err("Input is not valid utf8"));
+    .and_then(|s| Ok(String::from(s)))
+    .or(Err("Input is not valid utf8"));
   return Ok((Token::Identifier(id?), j));
 }
 
@@ -274,41 +279,41 @@ pub fn tokenize(program: &[u8]) -> Result<Vec<Token>, String> {
         } else {
           result = lex_numeric_literal(program, i);
         }
-      },
+      }
       digit_chars!() => {
         // numeric literal
         result = lex_numeric_literal(program, i);
-      },
+      }
       '.' => {
         // float
         result = lex_float_literal(program, i, i + 1);
-      },
+      }
       '$' => {
         // reference
         result = lex_reference(program, i + 1);
-      },
+      }
       ident_chars!() => {
         // identifier
         result = lex_identifier(program, i);
-      },
+      }
       '(' => {
         // left parenthesis
         tokens.push(Token::LParen());
         i += 1;
         continue;
-      },
+      }
       ')' => {
         // right parenthesis
         tokens.push(Token::RParen());
         i += 1;
         continue;
-      },
+      }
       '\n' => {
         // newline
         tokens.push(Token::Newline());
         i += 1;
         continue;
-      },
+      }
       ' ' | '\t' => {
         // whitespace
         i += 1;
@@ -318,8 +323,8 @@ pub fn tokenize(program: &[u8]) -> Result<Vec<Token>, String> {
         // possibly an operator
         let end = min(i + LONGEST_OPERATOR, program.len());
         let slice = std::str::from_utf8(&program[i..end])
-            .or(Err(String::from("Failed to convert slice to UTF-8")))
-            .unwrap();
+          .or(Err(String::from("Failed to convert slice to UTF-8")))
+          .unwrap();
 
         let m = op_regex.find(slice);
         if m.is_none() {
@@ -329,14 +334,11 @@ pub fn tokenize(program: &[u8]) -> Result<Vec<Token>, String> {
         let op = m.unwrap();
         let start = i + op.start();
         let end = i + op.end();
-        let op_str = std::str::from_utf8(&program[start..end])
-            .or(Err(String::from("Input is not valid utf8")))?;
+        let op_str = std::str::from_utf8(&program[start..end]).or(Err(String::from("Input is not valid utf8")))?;
 
         if is_unary(op_str) {
           let unary = match tokens.last() {
-            Some(Token::Integer(_)) |
-            Some(Token::Float(_)) |
-            Some(Token::Reference(_)) => false,
+            Some(Token::Integer(_)) | Some(Token::Float(_)) | Some(Token::Reference(_)) => false,
             _ => true,
           };
 
