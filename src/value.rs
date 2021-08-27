@@ -380,7 +380,10 @@ impl Value {
         Hex => value_fmt!(*v, w, "{:#x}"),
         Octal => value_fmt!(*v, w, "{:#o}"),
       },
-      Float(v) => format!("{}", v),
+      Float(v) => match format {
+        Alfred => generate_alfred_output(*self),
+        _ => format!("{}", v),
+      },
     }
   }
 
@@ -499,16 +502,14 @@ fn generate_alfred_output(value: Value) -> String {
         "\
 <?xml version=\"1.0\"?>
 <items>
-  <item arg=\"{expr}\" valid=\"YES\" autocomplete=\"{pretty_dec}\" type=\"default\">
-    <title>{pretty_dec}</title>
+  <item arg=\"{expr}\" valid=\"YES\" autocomplete=\"{expr}\" type=\"default\">
+    <title>{expr}</title>
     <subtitle>copy+paste as \"{expr}\"</subtitle>
-    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{pretty_dec}&quot;\" valid=\"yes\" arg=\"{pretty_dec}\"/>
+    <mod key=\"shift\" subtitle=\"copy+paste as &quot;{expr}&quot;\" valid=\"yes\" arg=\"{expr}\"/>
     <icon>dec.png</icon>
   </item>
-</items>
-",
+</items>",
         expr = v,
-        pretty_dec = v
       )
     }
   }

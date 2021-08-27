@@ -8,7 +8,13 @@ integers. The calculator also maintains a persistent buffer of previous
 results that can be used in your calculations with the reference syntax: `$0`,
 `$1`, etc.
 
+While this can be used as a simple shell calculator, it was originally written
+to be used with the popular macOS productivity tool [Alfred](https://www.alfredapp.com/). 
+As such, support for Alfred has been built-in to the calculator itself, and the provided 
+Makefile can be used to build the Alfred workflow.
+
 ## Options
+
 By default, expressions are read from stdin but you may also supply the 
 them in a file with the `-f` option, or on the command line using the `-e`
 option.
@@ -29,6 +35,7 @@ OPTIONS:
     -B, --buffer-file <FILE>    Specify an alternate buffer file
     -e, --expr <EXPRESSION>     Expression to evaluate
     -f, --file <FILE>           Read program from file
+    -o <FORMAT>                 Output format [all|bin|hex|oct|alfred]
 ```
 
 ## Built-ins
@@ -83,4 +90,19 @@ The following types are supported:
 | `i32()`   | Casts number to i32                 | `i64`    |
 | `i16()`   | Casts number to i16                 | `i64`    |
 | `i8()`    | Casts number to i8                  | `i64`    |
+
+## Author
+
+Aaron Gill-Braun aarongillbraun@gmail.com
+
+This project was inspired by [radix-calc](https://github.com/goodell/radix-calc).
+
+## License
+
+MIT License, see the LICENSE file.
+
+The icons used in the Alfred workflow were taken from radix-calc. The main 
+calculator icon was originally taken from [Aiconica](https://aiconica.net/detail/calculator-1000),
+licensed CC0 1.0. The dec/hex/oct/bin icons are orginal works by the author of
+[radix-calc](https://github.com/goodell/radix-calc) and are also licensed under CC0 1.0.
 
