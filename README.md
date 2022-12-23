@@ -4,9 +4,7 @@ This is a simple yet powerful calculator built with programmers in mind. It
 supports all standard arithmetic, bitwise and logical operators, numerous 
 mathematical functions and numbers with differing bases. It also features a
 lose "type system" allowing calculations to be performed on fixed-width
-integers. The calculator also maintains a persistent buffer of previous 
-results that can be used in your calculations with the reference syntax: `$0`,
-`$1`, etc.
+integers.
 
 While this can be used as a simple shell calculator, it was originally written
 to be used with the popular macOS productivity tool [Alfred](https://www.alfredapp.com/). 
@@ -19,9 +17,6 @@ By default, expressions are read from stdin but you may also supply the
 them in a file with the `-f` option, or on the command line using the `-e`
 option.
 
-The buffer file is located by default at `$HOME/.clc_history` but this 
-location can be changed by supplying the `-B` option.
-
 ```
 USAGE:
     clc [OPTIONS]
@@ -31,10 +26,8 @@ FLAGS:
     -V, --version    Print version information
 
 OPTIONS:
-    -b, --buffer-size <SIZE>    Set the max buffer size [default: 32]
-    -B, --buffer-file <FILE>    Specify an alternate buffer file
     -e, --expr <EXPRESSION>     Expression to evaluate
-    -f, --file <FILE>           Read program from file
+    -f, --file <FILE>           Read expression from file
     -o <FORMAT>                 Output format [all|bin|hex|oct|alfred]
 ```
 
@@ -58,8 +51,8 @@ The following types are supported:
 | `NAN`        | Not a number (NaN)       | `f64`    |
 | `INF`        | Infinity (∞)             | `f64`    |
 | `NEG_INF`    | Negative infinity (-∞)   | `f64`    |
-| `MIN_<type>` | Minimum value of type    | `type`   |
-| `MAX_<type>` | Maximum value of type    | `type`   |   
+| `<type>_MIN` | Minimum value of type    | `type`   |
+| `<type>_MAX` | Maximum value of type    | `type`   |   
 
 ### Functions
 
@@ -81,6 +74,7 @@ The following types are supported:
 | `log2()`  | Compute base 2 logarithm of number  | `f64`    |
 | `log10()` | Compute base 10 logarithm of number | `f64`    |
 | `deg()`   | Converts degrees to radians         | `f64`    |
+| `rad()`   | Converts radians to degrees         | `f64`    |
 | **Name**  | **Description**                     | **Type** |
 | `u64()`   | Casts number to u64                 | `u64`    |
 | `u32()`   | Casts number to u32                 | `u32`    |
@@ -89,7 +83,7 @@ The following types are supported:
 | `i64()`   | Casts number to i64                 | `i64`    |
 | `i32()`   | Casts number to i32                 | `i32`    |
 | `i16()`   | Casts number to i16                 | `i16`    |
-| `i8()`    | Casts number to i8                  | `i8`    |
+| `i8()`    | Casts number to i8                  | `i8`     |
 
 ## Author
 

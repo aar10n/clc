@@ -1,107 +1,159 @@
-use crate::buffer::Buffer;
 use crate::lexer::Token;
-use crate::names::{get_name, Name};
-use crate::operators::{conv_op_token, Assoc};
+use crate::symbols::{get_constant, get_function, Function};
 use crate::value::{Value, Width};
+use phf::phf_map;
 
-//
+const PRECEDENCE_TABLE: phf::Map<&'static str, (i32, Assoc)> = phf_map! {
+  "+u" => (11, Assoc::Right), // unary plus
+  "-u" => (11, Assoc::Right), // unary minus
+  "!u" => (10, Assoc::Right), // logical not
+  "~u" => (10, Assoc::Right), // bitwise not
 
-fn process_tokens(tokens: &Vec<Token>, buffer: &Buffer) -> Result<Vec<Token>, String> {
-  let mut out_tokens: Vec<Token> = vec![];
-  let mut nl_count = 0;
-  for token in tokens.iter() {
-    match token {
-      Token::Newline() => nl_count += 1,
-      _ => nl_count = 0,
-    }
+  "*" => (9, Assoc::Left),   // multiplication
+  "/" => (9, Assoc::Left),   // division
+  "%" => (9, Assoc::Left),   // modulo
 
-    match token {
-      Token::Integer(_) | Token::Float(_) => {
-        out_tokens.push(Token::Value(token.as_value().unwrap()));
-        continue;
-      }
-      Token::BinaryOp(_) => {
-        out_tokens.push(conv_op_token(token));
-        continue;
-      }
-      Token::UnaryOp(op) => {
-        if op == "+u" {
-          // ignore unary +
-          continue;
-        }
-        out_tokens.push(conv_op_token(token));
-        continue;
-      }
-      Token::Reference(num) => {
-        let val = buffer.get(*num as usize);
-        out_tokens.push(Token::Value(val));
-        continue;
-      }
-      Token::Identifier(id) => {
-        let name = get_name(id);
-        if name.is_none() {
-          return Err(format!("Unknown name '{}'", id));
-        }
+  "+" => (8, Assoc::Left),   // addition
+  "-" => (8, Assoc::Left),   // subtraction
 
-        match name.unwrap() {
-          Name::Constant(val) => out_tokens.push(Token::Value(val())),
-          Name::Function(func) => out_tokens.push(Token::UnaryFunction(id.clone(), func)),
-        }
-        continue;
-      }
-      Token::Newline() => {
-        if nl_count > 1 {
-          // ignore extra newlines
-          continue;
-        }
-      }
-      _ => (),
-    }
-    out_tokens.push(token.clone());
-  }
+  "<<" => (7, Assoc::Left),  // bitwise left shift
+  ">>" => (7, Assoc::Left),  // bitwise right shift
 
-  if out_tokens.last().map_or(false, |v| !matches!(v, Token::Newline())) {
-    out_tokens.push(Token::Newline());
-  }
-  return Ok(out_tokens);
+  ">" => (6, Assoc::Left),   // greater than
+  "<" => (6, Assoc::Left),   // less than
+  ">=" => (6, Assoc::Left),  // greater than or equal to
+  "<=" => (6, Assoc::Left),  // greater than or equal to
+  "==" => (5, Assoc::Left),  // equal to
+  "!=" => (5, Assoc::Left),  // not equal to
+
+  "&" => (4, Assoc::Left),   // bitwise and
+  "^" => (3, Assoc::Left),   // bitwise xor
+  "|" => (2, Assoc::Left),   // bitwise or
+
+  "&&" => (1, Assoc::Left),  // logical and
+  "||" => (1, Assoc::Left),  // logical or
+
+  "(" => (0, Assoc::Right),   // parentheses
+};
+
+#[derive(Copy, Clone, Debug)]
+pub enum Assoc {
+  Left,
+  Right,
 }
 
-fn eval_expression(tokens: &Vec<&Token>) -> Result<Value, String> {
-  // expects the expression in rpn form
-  let mut stack: Vec<Value> = vec![];
-  let mut args: i32 = 0;
-  for token in tokens.iter() {
+/// Converts an infix expression to postfix notation.
+/// It also checks that all identifiers are valid and that the expression is well-formed.
+fn convert_expr_posfix(expr: Vec<Token>) -> Result<Vec<Token>, String> {
+  let mut op_stack: Vec<Token> = vec![];
+  let mut rpn_expr: Vec<Token> = vec![];
+
+  for token in expr.into_iter() {
     match token {
-      Token::Value(v) => {
-        stack.push(*v);
-        args += 1;
+      Token::Value(_) => rpn_expr.push(token),
+      Token::Identifier(id) => {
+        if let Some(value) = get_constant(&id) {
+          rpn_expr.push(Token::Value(value));
+        } else if let Some(_) = get_function(&id) {
+          op_stack.push(Token::Identifier(id));
+        } else {
+          return Err(format!("Unknown identifier '{}'", id));
+        }
       }
-      Token::UnaryFunction(name, func) => {
-        if args < 1 {
+      Token::Operator(op) => {
+        // pop operators off the stack until we find one with a lower precedence
+        let (prec, assoc) = PRECEDENCE_TABLE[&op];
+
+        while let Some(other) = op_stack.last() {
+          let (o_prec, _) = match other {
+            Token::Operator(t_op) => PRECEDENCE_TABLE[t_op],
+            _ => break,
+          };
+
+          if o_prec >= prec && matches!(assoc, Assoc::Left) {
+            rpn_expr.push(op_stack.pop().unwrap());
+          } else {
+            break;
+          }
+        }
+        op_stack.push(Token::Operator(op));
+      }
+      Token::LParen => op_stack.push(token),
+      Token::RParen => {
+        // pop operators off the stack until we find a '('
+        while let Some(t) = op_stack.pop() {
+          if t.is_lparen() {
+            op_stack.push(t);
+            break;
+          }
+          rpn_expr.push(t);
+        }
+
+        // the stack isn't empty and we didn't find a '(' then there's a mismatched ')'
+        if op_stack.is_empty() || !op_stack.last().unwrap().is_lparen() {
+          return Err("Encountered ')' without matching '('".to_string());
+        }
+        op_stack.pop();
+
+        // if the next token is a function then pop it into the output array
+        if matches!(op_stack.last(), Some(Token::Identifier(_))) {
+          rpn_expr.push(op_stack.pop().unwrap());
+        }
+      }
+      Token::Newline => unreachable!(),
+    }
+  }
+
+  while let Some(t) = op_stack.pop() {
+    if t.is_lparen() {
+      return Err("Unmatched ')'".to_string());
+    }
+    rpn_expr.push(t);
+  }
+  Ok(rpn_expr)
+}
+
+/// Evaluates a postfix expression and returns the result.
+fn evaluate_expr_postfix(expr: &Vec<Token>) -> Result<Value, String> {
+  if expr.is_empty() {
+    panic!("empty expression");
+  }
+
+  let mut stack: Vec<Value> = vec![];
+  let mut nargs: usize = 0;
+
+  for token in expr.into_iter() {
+    if let Token::Value(v) = token {
+      stack.push(*v);
+      nargs += 1;
+      continue;
+    }
+
+    let name = match token {
+      Token::Identifier(name) | Token::Operator(name) => name,
+      _ => unreachable!(),
+    };
+
+    let func = get_function(name).unwrap();
+    match func {
+      Function::Unary(func) => {
+        if nargs < 1 {
           return Err(format!("Expected one argument to {}", name));
         }
 
         let arg = stack.pop().unwrap();
-        args -= 1;
-        let res = func(arg);
-        // println!("{} | {:?} -> {:?}", name, arg, res);
-        stack.push(res);
-        args += 1;
+        stack.push(func(arg));
       }
-      Token::BinaryFunction(name, func) => {
-        if args < 2 {
+      Function::Binary(func) => {
+        if nargs < 2 {
           return Err(format!("Expected two arguments to {}", name));
         }
 
         let arg2 = stack.pop().unwrap();
         let arg1 = stack.pop().unwrap();
-        args -= 2;
-        let res = func(arg1, arg2);
-        // println!("{} | {:?} {:?} -> {:?}", name, arg1, arg2, res);
-        stack.push(res);
-        args += 1;
+        stack.push(func(arg1, arg2));
+        nargs -= 1; // we popped two but added one back
       }
-      _ => panic!("unexpected token"),
     }
   }
 
@@ -109,95 +161,31 @@ fn eval_expression(tokens: &Vec<&Token>) -> Result<Value, String> {
     eprintln!("stack: {:?}", stack);
     panic!("unexpected stack state");
   }
-
   let value = stack.pop().unwrap();
   return Ok(value);
 }
 
 //
 
-pub fn parse(tokens: &Vec<Token>, buffer: &mut Buffer) -> Result<Value, String> {
-  let mut op_stack: Vec<&'_ Token> = vec![];
-  let mut output: Vec<&'_ Token> = vec![];
+pub fn parse(tokens: Vec<Token>) -> Result<Value, String> {
   let mut values: Vec<Value> = vec![];
-
-  // println!("--- tokens ---");
-  // println!("{:?}", tokens);
-
-  let toks = process_tokens(tokens, buffer)?;
-  // println!("--- processed ---");
-  // println!("{:?}", toks);
-
-  // convert expression to rpn
-  for token in toks.iter() {
-    match token {
-      Token::Value(_) => {
-        output.push(token);
-      }
-      Token::UnaryFunction(_, _) => {
-        op_stack.push(token);
-      }
-      Token::BinaryFunction(_, _) => {
-        while !op_stack.is_empty() {
-          let op = *op_stack.last().unwrap();
-          if op.prec() >= token.prec() && matches!(token.assoc(), Assoc::Left) {
-            op_stack.pop();
-            output.push(op);
-          } else {
-            break;
-          }
-        }
-        op_stack.push(token);
-      }
-      Token::LParen() => {
-        op_stack.push(token);
-      }
-      Token::RParen() => {
-        while !op_stack.is_empty() {
-          let op = *op_stack.last().unwrap();
-          if matches!(op, Token::LParen()) {
-            break;
-          }
-          op_stack.pop();
-          output.push(op);
-        }
-
-        if op_stack.is_empty() || !matches!(op_stack.last().unwrap(), Token::LParen()) {
-          return Err(String::from("Encountered ')' without matching '('"));
-        }
-        op_stack.pop();
-
-        if op_stack.last().map_or(false, |t| {
-          matches!(t, Token::UnaryFunction(_, _)) || matches!(t, Token::BinaryFunction(_, _))
-        }) {
-          let func = *op_stack.last().unwrap();
-          op_stack.pop();
-          output.push(func);
-        }
-      }
-      Token::Newline() => {
-        while !op_stack.is_empty() {
-          let op = *op_stack.last().unwrap();
-          match op {
-            Token::LParen() => return Err(String::from("Unmatched ')'")),
-            _ => {
-              op_stack.pop();
-              output.push(op);
-            }
-          }
-        }
-
-        // println!("--- output ---");
-        // println!("{:?}", output);
-        // println!("--- evaluating ---");
-        let value = eval_expression(&output)?;
-        // println!("--- value ---");
-        // println!("{:?}", value);
-        values.push(value);
-        buffer.add(value);
-      }
-      _ => panic!("unexpected token {:?}", token),
+  for expr in tokens.split(|t| t.is_newline()) {
+    if expr.is_empty() {
+      continue;
     }
+
+    // println!("--- tokens ---");
+    // println!("infix: {:?}", expr);
+    let rpn_expr = convert_expr_posfix(expr.to_vec())?;
+    if rpn_expr.is_empty() {
+      // empty expression like "()"
+      continue;
+    }
+
+    // println!("postfix: {:?}", rpn_expr);
+    let value = evaluate_expr_postfix(&rpn_expr)?;
+    // println!("value: {}", value.to_string());
+    values.push(value);
   }
 
   let last = values.last();

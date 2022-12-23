@@ -1,8 +1,7 @@
-use float_cmp::approx_eq;
 use std::cmp::Ordering;
-use std::fmt;
-use std::fmt::Display;
-use std::ops;
+use std::{fmt, fmt::Display};
+
+use float_cmp::approx_eq;
 
 #[rustfmt::skip]
 macro_rules! do_cast {
@@ -106,7 +105,7 @@ macro_rules! binary_int_op {
 
 macro_rules! impl_unary_op {
   ($ops: tt, $func: tt, $call: ident, $op: tt) => {
-    impl ops::$ops for Value {
+    impl std::ops::$ops for Value {
       type Output = Value;
 
       fn $func(self) -> Value {
@@ -123,7 +122,7 @@ macro_rules! impl_unary_op {
 
 macro_rules! impl_arithmetic_op {
   ($ops: tt, $func: tt, $call: ident, $op: tt) => {
-    impl ops::$ops<Value> for Value {
+    impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
         use Value::*;
@@ -145,7 +144,7 @@ macro_rules! impl_arithmetic_op {
 
 macro_rules! impl_bitwise_op {
   ($ops: tt, $func: tt, $op: tt) => {
-    impl ops::$ops<Value> for Value {
+    impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
         use Value::*;
@@ -165,7 +164,7 @@ macro_rules! impl_bitwise_op {
   };
 }
 
-macro_rules! impl_from {
+macro_rules! impl_value_from {
   ($t: tt) => {
     impl From<$t> for Value {
       fn from(v: $t) -> Self {
@@ -198,31 +197,6 @@ macro_rules! impl_from_value {
 }
 
 //
-//
-//
-
-#[derive(Clone, Copy)]
-pub enum Format {
-  Default,
-  All,
-  Alfred,
-  Binary,
-  Hex,
-  Octal,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Width {
-  U64,
-  U32,
-  U16,
-  U8,
-
-  I64,
-  I32,
-  I16,
-  I8,
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum Value {
@@ -243,7 +217,7 @@ impl_bitwise_op!(Shl, shl, <<);
 impl_bitwise_op!(Shr, shr, >>);
 
 impl_unary_op!(Neg, neg, wrapping_neg, -);
-impl ops::Not for Value {
+impl std::ops::Not for Value {
   type Output = Value;
 
   fn not(self) -> Value {
@@ -306,18 +280,18 @@ impl PartialOrd<Value> for Value {
 }
 
 // `From` traits
-impl_from!(u64, Width::U64);
-impl_from!(u32, Width::U32);
-impl_from!(u16, Width::U16);
-impl_from!(u8, Width::U8);
+impl_value_from!(u64, Width::U64);
+impl_value_from!(u32, Width::U32);
+impl_value_from!(u16, Width::U16);
+impl_value_from!(u8, Width::U8);
 
-impl_from!(i64, Width::I64);
-impl_from!(i32, Width::I32);
-impl_from!(i16, Width::I16);
-impl_from!(i8, Width::I8);
+impl_value_from!(i64, Width::I64);
+impl_value_from!(i32, Width::I32);
+impl_value_from!(i16, Width::I16);
+impl_value_from!(i8, Width::I8);
 
-impl_from!(bool, Width::U8);
-impl_from!(f64);
+impl_value_from!(bool, Width::U8);
+impl_value_from!(f64);
 
 impl_from_value!(u64);
 impl_from_value!(u32);
@@ -338,31 +312,6 @@ impl From<Value> for bool {
       Integer(v, _) => v != 0,
       Float(v) => v != 0f64,
     };
-  }
-}
-
-//
-
-impl Width {
-  pub fn as_string(&self) -> &str {
-    use Width::*;
-    match self {
-      U64 => "u64",
-      U32 => "u32",
-      U16 => "u16",
-      U8 => "u8",
-
-      I64 => "i64",
-      I32 => "i32",
-      I16 => "i16",
-      I8 => "i8",
-    }
-  }
-}
-
-impl Display for Width {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}", self.as_string())
   }
 }
 
@@ -454,19 +403,49 @@ impl Value {
   }
 }
 
-//
+#[derive(Clone, Copy)]
+pub enum Format {
+  Default,
+  All,
+  Alfred,
+  Binary,
+  Hex,
+  Octal,
+}
 
-impl Value {
-  pub fn abs(&self) -> Value {
-    if self.is_signed() {
-      if *self < Value::from(0u64) {
-        -*self
-      } else {
-        *self
-      }
-    } else {
-      *self
+#[derive(Debug, Clone, Copy)]
+pub enum Width {
+  U64,
+  U32,
+  U16,
+  U8,
+
+  I64,
+  I32,
+  I16,
+  I8,
+}
+
+impl Width {
+  pub fn as_string(&self) -> &str {
+    use Width::*;
+    match self {
+      U64 => "u64",
+      U32 => "u32",
+      U16 => "u16",
+      U8 => "u8",
+
+      I64 => "i64",
+      I32 => "i32",
+      I16 => "i16",
+      I8 => "i8",
     }
+  }
+}
+
+impl Display for Width {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.as_string())
   }
 }
 

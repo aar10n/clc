@@ -1,50 +1,33 @@
-mod buffer;
 mod lexer;
-mod names;
-mod operators;
 mod parser;
+mod symbols;
 mod value;
 
-use crate::buffer::Buffer;
 use crate::lexer::tokenize;
 use crate::parser::parse;
 use crate::value::Format;
 use clap::Parser;
-use std::env;
 use std::fs::File;
 use std::io::{self, Read};
-use std::path::Path;
 use std::process;
 
-pub const CONFIG_FILE: &str = ".clcrc";
-pub const BUFFER_FILE: &str = ".clc_history";
-pub const BUFFER_SIZE: u8 = 32;
-
 #[derive(Parser, Debug)]
-#[command(name = "clc", version = "1.0")]
+#[command(name = "clc", version = "1.1")]
 pub struct Opts {
-  /// Set the max buffer size.
-  #[arg(short, long, value_name = "SIZE", default_value = "32")]
-  buffer_size: u8,
-
-  /// Specify an alternate buffer file.
-  #[arg(short = 'B', long, value_name = "FILE")]
-  buffer_file: Option<String>,
-
-  /// Read program from file.
+  /// Read expression from file.
   #[arg(short, long)]
   file: Option<String>,
 
   /// Expression to evaluate
-  #[arg(short, long = "expr", conflicts_with = "file")]
-  expression: Option<String>,
+  #[arg(short, long, conflicts_with = "file")]
+  expr: Option<String>,
 
   /// Output format [all|bin|hex|oct|alfred]
   #[arg(short = 'o')]
   format: Option<String>,
 }
 
-fn read_program(opts: &Opts) -> String {
+fn read_input(opts: &Opts) -> String {
   let mut program = String::new();
   if opts.file.is_some() {
     let file = File::open(opts.file.clone().unwrap());
@@ -57,8 +40,8 @@ fn read_program(opts: &Opts) -> String {
         process::exit(1);
       }
     }
-  } else if opts.expression.is_some() {
-    program = opts.expression.clone().unwrap();
+  } else if opts.expr.is_some() {
+    program = opts.expr.clone().unwrap();
   } else {
     let stdin = io::stdin();
     match stdin.read_line(&mut program) {
@@ -93,7 +76,7 @@ fn output_err(err: String, format: Format) {
 
 fn main() {
   let mut format = Format::Default;
-  let mut opts = Opts::parse();
+  let opts = Opts::parse();
   if opts.format.is_some() {
     let fmt = opts.format.clone().unwrap();
     format = match fmt.as_str() {
@@ -109,21 +92,8 @@ fn main() {
     }
   }
 
-  let home = env::var("HOME").map_or(String::from(""), |p| p);
-  if opts.buffer_file.is_none() {
-    opts.buffer_file = Some(String::from(Path::new(&home).join(BUFFER_FILE).to_str().unwrap()));
-  }
-
-  let mut buffer = match Buffer::create(&opts) {
-    Ok(b) => b,
-    Err(err) => {
-      output_err(format!("failed to read buffer: {}", err), format);
-      process::exit(1);
-    }
-  };
-
-  let program = read_program(&opts);
-  let tokens = match tokenize(program.as_bytes()) {
+  let program = read_input(&opts);
+  let tokens = match tokenize(&program) {
     Ok(tokens) => tokens,
     Err(err) => {
       output_err(err, format);
@@ -131,15 +101,13 @@ fn main() {
     }
   };
 
-  let result = match parse(&tokens, &mut buffer) {
+  let result = match parse(tokens) {
     Ok(value) => value,
     Err(err) => {
-      buffer.save();
       output_err(err, format);
       process::exit(1);
     }
   };
 
-  buffer.save();
   println!("{}", result.as_format_string(format));
 }
