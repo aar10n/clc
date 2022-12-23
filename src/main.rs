@@ -22,7 +22,7 @@ pub struct Opts {
   #[arg(short, long, conflicts_with = "file")]
   expr: Option<String>,
 
-  /// Output format [all|bin|hex|oct|alfred]
+  /// Output format [bin|hex|oct|alfred]
   #[arg(short = 'o')]
   format: Option<String>,
 }
@@ -80,7 +80,6 @@ fn main() {
   if opts.format.is_some() {
     let fmt = opts.format.clone().unwrap();
     format = match fmt.as_str() {
-      "all" => Format::All,
       "bin" => Format::Binary,
       "hex" => Format::Hex,
       "oct" => Format::Octal,

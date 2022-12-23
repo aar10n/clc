@@ -7,8 +7,8 @@ use float_cmp::approx_eq;
 macro_rules! do_cast {
   ($v: expr, $w: expr, $t: tt) => {
     match $w {
-      U64 => ($v as u64) as $t, U32 => ($v as u32) as $t, U16 => ($v as u16) as $t, U8 => ($v as u8) as $t,
-      I64 => ($v as i64) as $t, I32 => ($v as i32) as $t, I16 => ($v as i16) as $t, I8 => ($v as i8) as $t,
+      Width::U64 => ($v as u64) as $t, Width::U32 => ($v as u32) as $t, Width::U16 => ($v as u16) as $t, Width::U8 => ($v as u8) as $t,
+      Width::I64 => ($v as i64) as $t, Width::I32 => ($v as i32) as $t, Width::I16 => ($v as i16) as $t, Width::I8 => ($v as i8) as $t,
     }
   };
 }
@@ -16,14 +16,14 @@ macro_rules! do_cast {
 macro_rules! unary_call {
   ($v: expr, $w: expr, $call: ident, $t: tt) => {
     match $w {
-      U64 => ($v as u64).$call() as $t,
-      U32 => ($v as u32).$call() as $t,
-      U16 => ($v as u16).$call() as $t,
-      U8 => ($v as u8).$call() as $t,
-      I64 => ($v as i64).$call() as $t,
-      I32 => ($v as i32).$call() as $t,
-      I16 => ($v as i16).$call() as $t,
-      I8 => ($v as i8).$call() as $t,
+      Width::U64 => ($v as u64).$call() as $t,
+      Width::U32 => ($v as u32).$call() as $t,
+      Width::U16 => ($v as u16).$call() as $t,
+      Width::U8 => ($v as u8).$call() as $t,
+      Width::I64 => ($v as i64).$call() as $t,
+      Width::I32 => ($v as i32).$call() as $t,
+      Width::I16 => ($v as i16).$call() as $t,
+      Width::I8 => ($v as i8).$call() as $t,
     }
   };
 }
@@ -31,14 +31,14 @@ macro_rules! unary_call {
 macro_rules! unary_op {
   ($v: expr, $w: expr, $op: tt, $t: tt) => {
     match $w {
-      U64 => ($op($v as u64)) as $t,
-      U32 => ($op($v as u32)) as $t,
-      U16 => ($op($v as u16)) as $t,
-      U8 => ($op($v as u8)) as $t,
-      I64 => ($op($v as i64)) as $t,
-      I32 => ($op($v as i32)) as $t,
-      I16 => ($op($v as i16)) as $t,
-      I8 => ($op($v as i8)) as $t,
+      Width::U64 => ($op($v as u64)) as $t,
+      Width::U32 => ($op($v as u32)) as $t,
+      Width::U16 => ($op($v as u16)) as $t,
+      Width::U8 => ($op($v as u8)) as $t,
+      Width::I64 => ($op($v as i64)) as $t,
+      Width::I32 => ($op($v as i32)) as $t,
+      Width::I16 => ($op($v as i16)) as $t,
+      Width::I8 => ($op($v as i8)) as $t,
     }
   };
 }
@@ -46,11 +46,11 @@ macro_rules! unary_op {
 macro_rules! binary_op {
   ($v1: expr, $v2: expr, $w: expr, $op: tt, $t: tt) => {
     match $w {
-      U64 => (($v1 as u64) $op ($v2 as u64)) as $t, U32 => (($v1 as u32) $op ($v2 as u32)) as $t,
-      U16 => (($v1 as u16) $op ($v2 as u16)) as $t, U8 => (($v1 as u8) $op ($v2 as u8)) as $t,
+      Width::U64 => (($v1 as u64) $op ($v2 as u64)) as $t, Width::U32 => (($v1 as u32) $op ($v2 as u32)) as $t,
+      Width::U16 => (($v1 as u16) $op ($v2 as u16)) as $t, Width::U8 => (($v1 as u8) $op ($v2 as u8)) as $t,
 
-      I64 => (($v1 as i64) $op ($v2 as i64)) as $t, I32 => (($v1 as i32) $op ($v2 as i32)) as $t,
-      I16 => (($v1 as i16) $op ($v2 as i16)) as $t, I8 => (($v1 as i8) $op ($v2 as i8)) as $t,
+      Width::I64 => (($v1 as i64) $op ($v2 as i64)) as $t, Width::I32 => (($v1 as i32) $op ($v2 as i32)) as $t,
+      Width::I16 => (($v1 as i16) $op ($v2 as i16)) as $t, Width::I8 => (($v1 as i8) $op ($v2 as i8)) as $t,
     }
   };
 }
@@ -58,15 +58,15 @@ macro_rules! binary_op {
 macro_rules! binary_call {
   ($v1: expr, $v2: expr, $w: expr, $call: ident, $t: tt) => {
     match $w {
-      U64 => (($v1 as u64).$call($v2 as u64)) as $t,
-      U32 => (($v1 as u32).$call($v2 as u32)) as $t,
-      U16 => (($v1 as u16).$call($v2 as u16)) as $t,
-      U8 => (($v1 as u8).$call($v2 as u8)) as $t,
+      Width::U64 => (($v1 as u64).$call($v2 as u64)) as $t,
+      Width::U32 => (($v1 as u32).$call($v2 as u32)) as $t,
+      Width::U16 => (($v1 as u16).$call($v2 as u16)) as $t,
+      Width::U8 => (($v1 as u8).$call($v2 as u8)) as $t,
 
-      I64 => (($v1 as i64).$call($v2 as i64)) as $t,
-      I32 => (($v1 as i32).$call($v2 as i32)) as $t,
-      I16 => (($v1 as i16).$call($v2 as i16)) as $t,
-      I8 => (($v1 as i8).$call($v2 as i8)) as $t,
+      Width::I64 => (($v1 as i64).$call($v2 as i64)) as $t,
+      Width::I32 => (($v1 as i32).$call($v2 as i32)) as $t,
+      Width::I16 => (($v1 as i16).$call($v2 as i16)) as $t,
+      Width::I8 => (($v1 as i8).$call($v2 as i8)) as $t,
     }
   };
 }
@@ -75,11 +75,11 @@ macro_rules! binary_call {
 macro_rules! cmp {
   ($v1: expr, $v2: expr, $w: expr) => {
     match $w {
-      U64 => (($v1 as u64).cmp(&($v2 as u64))), U32 => (($v1 as u32).cmp(&($v2 as u32))), 
-      U16 => (($v1 as u16).cmp(&($v2 as u16))), U8 => (($v1 as u8).cmp(&($v2 as u8))),
+      Width::U64 => (($v1 as u64).cmp(&($v2 as u64))), Width::U32 => (($v1 as u32).cmp(&($v2 as u32))), 
+      Width::U16 => (($v1 as u16).cmp(&($v2 as u16))), Width::U8 => (($v1 as u8).cmp(&($v2 as u8))),
 
-      I64 => (($v1 as i64).cmp(&($v2 as i64))), I32 => (($v1 as i32).cmp(&($v2 as i32))),
-      I16 => (($v1 as i16).cmp(&($v2 as i16))), I8 => (($v1 as i8).cmp(&($v2 as i8))),
+      Width::I64 => (($v1 as i64).cmp(&($v2 as i64))), Width::I32 => (($v1 as i32).cmp(&($v2 as i32))),
+      Width::I16 => (($v1 as i16).cmp(&($v2 as i16))), Width::I8 => (($v1 as i8).cmp(&($v2 as i8))),
     }
   };
 }
@@ -88,11 +88,11 @@ macro_rules! cmp {
 macro_rules! value_fmt {
   ($v: expr, $w: expr, $f: expr) => {
     match $w {
-      U64 => format!($f, $v as u64), U32 => format!($f, $v as u32), 
-      U16 => format!($f, $v as u16), U8 => format!($f, $v as u8),
+      Width::U64 => format!($f, $v as u64), Width::U32 => format!($f, $v as u32), 
+      Width::U16 => format!($f, $v as u16), Width::U8 => format!($f, $v as u8),
 
-      I64 => format!($f, $v as i64), I32 => format!($f, $v as i32),
-      I16 => format!($f, $v as i16), I8 => format!($f, $v as i8),
+      Width::I64 => format!($f, $v as i64), Width::I32 => format!($f, $v as i32),
+      Width::I16 => format!($f, $v as i16), Width::I8 => format!($f, $v as i8),
     }
   };
 }
@@ -109,11 +109,9 @@ macro_rules! impl_unary_op {
       type Output = Value;
 
       fn $func(self) -> Value {
-        use Value::*;
-        use Width::*;
         return match self {
-          Integer(v, w) => Integer(unary_call!(v, w, $call, u64), w),
-          Float(v) => Float($op v),
+          Value::Integer(v, w) => Value::Integer(unary_call!(v, w, $call, u64), w),
+          Value::Float(v) => Value::Float($op v),
         };
       }
     }
@@ -125,16 +123,14 @@ macro_rules! impl_arithmetic_op {
     impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
-        use Value::*;
-        use Width::*;
         return match self {
-          Integer(v1, w) => match rhs {
-            Integer(v2, _) => Integer(binary_call!(v1, v2, w, $call, u64), w),
-            Float(v2) => Integer(binary_call!(v1, v2, w, $call, u64), w),
+          Value::Integer(v1, w) => match rhs {
+            Value::Integer(v2, _) => Value::Integer(binary_call!(v1, v2, w, $call, u64), w),
+            Value::Float(v2) => Value::Integer(binary_call!(v1, v2, w, $call, u64), w),
           },
-          Float(v1) => match rhs {
-            Integer(v2, _) => Float(v1 $op (v2 as f64)),
-            Float(v2) => Float(v1 $op v2),
+          Value::Float(v1) => match rhs {
+            Value::Integer(v2, _) => Value::Float(v1 $op (v2 as f64)),
+            Value::Float(v2) => Value::Float(v1 $op v2),
           },
         };
       }
@@ -147,16 +143,14 @@ macro_rules! impl_bitwise_op {
     impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
-        use Value::*;
-        use Width::*;
         return match self {
-          Integer(v1, w) => match rhs {
-            Integer(v2, _) => Integer(binary_int_op!(v1, v2, w, $op), w),
-            Float(v2) => Integer(binary_int_op!(v1, (v2 as u64), w, $op), w),
+          Value::Integer(v1, w) => match rhs {
+            Value::Integer(v2, _) => Value::Integer(binary_int_op!(v1, v2, w, $op), w),
+            Value::Float(v2) => Value::Integer(binary_int_op!(v1, (v2 as u64), w, $op), w),
           },
-          Float(_) => match rhs {
-            Integer(_, _) => Float(f64::NAN),
-            Float(_) => Float(f64::NAN),
+          Value::Float(_) => match rhs {
+            Value::Integer(_, _) => Value::Float(f64::NAN),
+            Value::Float(_) => Value::Float(f64::NAN),
           },
         };
       }
@@ -185,11 +179,9 @@ macro_rules! impl_from_value {
   ($t: tt) => {
     impl From<Value> for $t {
       fn from(src: Value) -> $t {
-        use Value::*;
-        use Width::*;
         return match src {
-          Integer(v, w) => do_cast!(v, w, $t),
-          Float(v) => v as $t,
+          Value::Integer(v, w) => do_cast!(v, w, $t),
+          Value::Float(v) => v as $t,
         };
       }
     }
@@ -221,11 +213,9 @@ impl std::ops::Not for Value {
   type Output = Value;
 
   fn not(self) -> Value {
-    use Value::*;
-    use Width::*;
     return match self {
-      Integer(v, w) => Integer(unary_op!(v, w, !, u64), w),
-      Float(v) => Integer((v != 0f64) as u64, Width::U8),
+      Value::Integer(v, w) => Value::Integer(unary_op!(v, w, !, u64), w),
+      Value::Float(v) => Value::Integer((v != 0f64) as u64, Width::U8),
     };
   }
 }
@@ -235,15 +225,13 @@ impl Eq for Value {}
 
 impl Ord for Value {
   fn cmp(&self, other: &Self) -> Ordering {
-    use Value::*;
-    use Width::*;
     return match self {
-      Integer(v1, w) => match other {
-        Integer(v2, _) => cmp!(*v1, *v2, w),
-        Float(v2) => cmp!(*v1, *v2, w),
+      Value::Integer(v1, w) => match other {
+        Value::Integer(v2, _) => cmp!(*v1, *v2, w),
+        Value::Float(v2) => cmp!(*v1, *v2, w),
       },
-      Float(v1) => match other {
-        Integer(v2, w) => {
+      Value::Float(v1) => match other {
+        Value::Integer(v2, w) => {
           let vf = do_cast!(*v2, w, f64);
           if approx_eq!(f64, *v1, vf) {
             Ordering::Equal
@@ -253,7 +241,7 @@ impl Ord for Value {
             Ordering::Greater
           }
         }
-        Float(v2) => {
+        Value::Float(v2) => {
           if approx_eq!(f64, *v1, *v2) {
             Ordering::Equal
           } else if v1 < &v2 {
@@ -307,57 +295,41 @@ impl_from_value!(f64);
 
 impl From<Value> for bool {
   fn from(src: Value) -> bool {
-    use Value::*;
     return match src {
-      Integer(v, _) => v != 0,
-      Float(v) => v != 0f64,
+      Value::Integer(v, _) => v != 0,
+      Value::Float(v) => v != 0f64,
     };
   }
 }
 
 impl Value {
   pub fn as_string(&self) -> String {
-    use Value::*;
-    use Width::*;
     match self {
-      Integer(v, w) => value_fmt!(*v, w, "{}"),
-      Float(v) => format!("{}", v),
+      Value::Integer(v, w) => value_fmt!(*v, w, "{}"),
+      Value::Float(v) => format!("{}", v),
     }
   }
 
   pub fn as_format_string(&self, format: Format) -> String {
-    use Format::*;
-    use Value::*;
-    use Width::*;
     match self {
-      Integer(v, w) => match format {
-        Default => value_fmt!(*v, w, "{}"),
-        All => {
-          format!(
-            "{}\n{}\n{}\n{}",
-            value_fmt!(*v, w, "{}"),
-            value_fmt!(*v, w, "{:#x}"),
-            value_fmt!(*v, w, "{:#o}"),
-            value_fmt!(*v, w, "{:#b}"),
-          )
-        }
-        Alfred => generate_alfred_output(*self),
-        Binary => value_fmt!(*v, w, "{:#b}"),
-        Hex => value_fmt!(*v, w, "{:#x}"),
-        Octal => value_fmt!(*v, w, "{:#o}"),
+      Value::Integer(v, w) => match format {
+        Format::Default => value_fmt!(*v, w, "{}"),
+        Format::Alfred => generate_alfred_output(*self),
+        Format::Binary => value_fmt!(*v, w, "{:#b}"),
+        Format::Hex => value_fmt!(*v, w, "{:#x}"),
+        Format::Octal => value_fmt!(*v, w, "{:#o}"),
       },
-      Float(v) => match format {
-        Alfred => generate_alfred_output(*self),
+      Value::Float(v) => match format {
+        Format::Alfred => generate_alfred_output(*self),
         _ => format!("{}", v),
       },
     }
   }
 
   pub fn as_typed_string(&self) -> String {
-    use Value::*;
     match self {
-      Integer(_, w) => format!("{} {}", w.as_string(), self.as_string()),
-      Float(v) => format!("f64 {}", v),
+      Value::Integer(_, w) => format!("{} {}", w.as_string(), self.as_string()),
+      Value::Float(v) => format!("f64 {}", v),
     }
   }
 }
@@ -372,22 +344,20 @@ impl Display for Value {
 
 impl Value {
   pub fn is_signed(&self) -> bool {
-    use Value::*;
     use Width::*;
     match self {
-      Integer(_, w) => match w {
+      Value::Integer(_, w) => match w {
         U64 | U32 | U16 | U8 => false,
         _ => true,
       },
-      Float(_) => true,
+      Value::Float(_) => true,
     }
   }
 
   pub fn to_signed(&self) -> Value {
-    use Value::*;
     use Width::*;
     match self {
-      Integer(v, w) => {
+      Value::Integer(v, w) => {
         let new_width = match w {
           U64 => I64,
           U32 => I64,
@@ -396,9 +366,9 @@ impl Value {
           _ => *w,
         };
 
-        Integer(*v, new_width)
+        Value::Integer(*v, new_width)
       }
-      Float(v) => Float(*v),
+      Value::Float(v) => Value::Float(*v),
     }
   }
 }
@@ -406,7 +376,6 @@ impl Value {
 #[derive(Clone, Copy)]
 pub enum Format {
   Default,
-  All,
   Alfred,
   Binary,
   Hex,
@@ -451,9 +420,8 @@ impl Display for Width {
 
 // Alfred workflow xml output
 fn generate_alfred_output(value: Value) -> String {
-  use Value::*;
   match value {
-    Integer(_, _) => {
+    Value::Integer(_, _) => {
       let expr = value.as_format_string(Format::Default);
       let expr_hex = value.as_format_string(Format::Hex);
       let expr_oct = value.as_format_string(Format::Octal);
@@ -493,7 +461,7 @@ fn generate_alfred_output(value: Value) -> String {
         binstr = expr_bin,
       )
     }
-    Float(v) => {
+    Value::Float(v) => {
       format!(
         "\
 <?xml version=\"1.0\"?>
