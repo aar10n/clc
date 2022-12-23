@@ -51,7 +51,7 @@ impl Token {
 #[derive(Logos, Clone, Debug, PartialEq)]
 pub enum RawToken {
   // eg. 101, 0x1F, 0o777, 0b1101
-  #[regex(r"0x[0-9a-fA-F]+|0o[0-7]+|0b[01]|[0-9]+", conv_integer)]
+  #[regex(r"0x[0-9a-fA-F]+|0o[0-7]+|0b[01]+|[0-9]+", conv_integer)]
   Integer(u64),
   // eg. 3.141, 0.0001, 2., .5
   #[regex(r"\d+\.\d*|\.\d+", conv_float)]
