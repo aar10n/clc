@@ -9,7 +9,7 @@ use crate::buffer::Buffer;
 use crate::lexer::tokenize;
 use crate::parser::parse;
 use crate::value::Format;
-use clap::Clap;
+use clap::Parser;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
@@ -20,27 +20,27 @@ pub const CONFIG_FILE: &str = ".clcrc";
 pub const BUFFER_FILE: &str = ".clc_history";
 pub const BUFFER_SIZE: u8 = 32;
 
-#[derive(Clap, Debug)]
-#[clap(name = "clc", version = "1.0")]
+#[derive(Parser, Debug)]
+#[command(name = "clc", version = "1.0")]
 pub struct Opts {
   /// Set the max buffer size.
-  #[clap(short, long, value_name = "SIZE", default_value = "32")]
+  #[arg(short, long, value_name = "SIZE", default_value = "32")]
   buffer_size: u8,
 
   /// Specify an alternate buffer file.
-  #[clap(short = 'B', long, value_name = "FILE")]
+  #[arg(short = 'B', long, value_name = "FILE")]
   buffer_file: Option<String>,
 
   /// Read program from file.
-  #[clap(short, long)]
+  #[arg(short, long)]
   file: Option<String>,
 
   /// Expression to evaluate
-  #[clap(short, long = "expr", conflicts_with = "file")]
+  #[arg(short, long = "expr", conflicts_with = "file")]
   expression: Option<String>,
 
   /// Output format [all|bin|hex|oct|alfred]
-  #[clap(short = 'o')]
+  #[arg(short = 'o')]
   format: Option<String>,
 }
 
@@ -123,8 +123,6 @@ fn main() {
   };
 
   let program = read_program(&opts);
-  // println!("{:?}", opts);
-  // println!("{}", program);
   let tokens = match tokenize(program.as_bytes()) {
     Ok(tokens) => tokens,
     Err(err) => {
