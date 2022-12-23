@@ -58,7 +58,7 @@ pub enum RawToken {
   Float(f64),
 
   // eg. sin, cos, PI
-  #[regex(r"[a-zA-Z]+")]
+  #[regex(r"[a-zA-Z][a-zA-Z0-9]*")]
   Identifier,
   // eg. *, /, %, &
   #[regex(r"==|!=|>|<|>=|<=|&|\||\^|<<|>>|&&|\|\||~|!|\+|-|\*|/|%")]
