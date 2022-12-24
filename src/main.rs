@@ -1,6 +1,6 @@
+mod functions;
 mod lexer;
 mod parser;
-mod symbols;
 mod value;
 
 use crate::lexer::tokenize;

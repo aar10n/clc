@@ -1,5 +1,5 @@
+use crate::functions::{get_constant, get_function, Function};
 use crate::lexer::Token;
-use crate::symbols::{get_constant, get_function, Function};
 use crate::value::{Value, Width};
 use phf::phf_map;
 
