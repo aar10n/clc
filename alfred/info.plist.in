@@ -125,6 +125,6 @@
 	<key>version</key>
 	<string>CLC_VERSION</string>
 	<key>webaddress</key>
-	<string>https://github.com/agillbraun/clc</string>
+	<string>https://github.com/aar10n/clc</string>
 </dict>
 </plist>
