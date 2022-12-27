@@ -192,3 +192,24 @@ pub fn parse(tokens: Vec<Token>) -> Result<Value, String> {
   }
   return Ok(Value::Integer(0, Width::U64));
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::tokenize;
+  use test_case::test_case;
+
+  #[test_case("()" => Ok(Value::Integer(0, Width::U64)))]
+  #[test_case("1" => Ok(Value::Integer(1, Width::U64)))]
+  #[test_case("1 + 2" => Ok(Value::Integer(3, Width::U64)))]
+  #[test_case("1.5 * 3" => Ok(Value::Float(4.5)))]
+  #[test_case("3 * 1.5" => Ok(Value::Integer(3, Width::U64)))]
+  #[test_case("(1 + 2) * 3" => Ok(Value::Integer(9, Width::U64)))]
+  #[test_case("sin(deg(90))" => Ok(Value::Float(1.0)))]
+  #[test_case("u32(1)" => Ok(Value::Integer(1, Width::U32)))]
+  #[test_case("u32(1) + 1" => Ok(Value::Integer(2, Width::U32)))]
+  fn test_parse(input: &str) -> Result<Value, String> {
+    let tokens = tokenize(input)?;
+    parse(tokens)
+  }
+}
