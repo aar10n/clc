@@ -165,8 +165,6 @@ fn evaluate_expr_postfix(expr: &Vec<Token>) -> Result<Value, String> {
   return Ok(value);
 }
 
-//
-
 pub fn parse(tokens: Vec<Token>) -> Result<Value, String> {
   let mut values: Vec<Value> = vec![];
   for expr in tokens.split(|t| t.is_newline()) {

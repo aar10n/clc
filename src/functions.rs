@@ -43,12 +43,12 @@ const CONST_TABLE: phf::Map<&'static str, fn() -> Value> = phf_map! {
 const FUNC_TABLE: phf::Map<&'static str, Function> = phf_map! {
   // operators
   "+u" => unary!(|v| v),
-  "-u" => unary!(|v| -(v as Value).to_signed()),
+  "-u" => unary!(|v| -(v as Value)),
   "!u" => unary!(|v| !bool::from(v)),
   "~u" => unary!(|v| !(v as Value)),
 
   "+" => binary!(|a, b| a + b),
-  "-" => binary!(|a, b| (a as Value).to_signed() - (b as Value).to_signed()),
+  "-" => binary!(|a, b| (a as Value) - (b as Value)),
   "*" => binary!(|a, b| a * b),
   "/" => binary!(|a, b| a / b),
   "%" => binary!(|a, b| a % b),
@@ -82,7 +82,7 @@ const FUNC_TABLE: phf::Map<&'static str, Function> = phf_map! {
   "f64" => unary!(|v| f64::from(v)),
 
   // unary functions
-  "abs" => unary!(|v| v), /* v.abs() */
+  "abs" => unary!(|v| if v < Value::from(0) { -(v as Value) } else { v }),
   "sin" => unary!(|v| f64::from(v).sin()),
   "cos" => unary!(|v| f64::from(v).cos()),
   "tan" => unary!(|v| f64::from(v).tan()),

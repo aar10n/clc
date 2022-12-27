@@ -54,7 +54,7 @@ macro_rules! impl_arithmetic_op {
     impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
-        return match self {
+        match self {
           Value::Integer(v1, w) => match rhs {
             Value::Integer(v2, _) => Value::Integer((v1 $op v2) & w.mask(), w),
             Value::Float(v2) => Value::Integer((v1 $op (v2 as u64)), w),
@@ -63,7 +63,7 @@ macro_rules! impl_arithmetic_op {
             Value::Integer(v2, _) => Value::Float(v1 $op (v2 as f64)),
             Value::Float(v2) => Value::Float(v1 $op v2),
           },
-        };
+        }
       }
     }
   };
@@ -74,7 +74,7 @@ macro_rules! impl_bitwise_op {
     impl std::ops::$ops<Value> for Value {
       type Output = Value;
       fn $func(self, rhs: Value) -> Value {
-        return match self {
+        match self {
           Value::Integer(v1, w) => match rhs {
             Value::Integer(v2, _) => Value::Integer((v1 $op v2) & w.mask(), w),
             Value::Float(v2) => Value::Integer((v1 $op (v2 as u64)) & w.mask(), w),
@@ -83,7 +83,7 @@ macro_rules! impl_bitwise_op {
             Value::Integer(_, _) => Value::Float(f64::NAN),
             Value::Float(_) => Value::Float(f64::NAN),
           },
-        };
+        }
       }
     }
   };
@@ -93,14 +93,14 @@ macro_rules! impl_value_from {
   ($t: tt) => {
     impl From<$t> for Value {
       fn from(v: $t) -> Self {
-        return Value::Float(v as f64);
+        Value::Float(v as f64)
       }
     }
   };
   ($t: tt, $w: expr) => {
     impl From<$t> for Value {
       fn from(v: $t) -> Self {
-        return Value::Integer(v as u64, $w);
+        Value::Integer(v as u64, $w)
       }
     }
   };
@@ -110,10 +110,10 @@ macro_rules! impl_from_value {
   ($t: tt) => {
     impl From<Value> for $t {
       fn from(src: Value) -> $t {
-        return match src {
+        match src {
           Value::Integer(v, w) => do_cast!(v, w, $t),
           Value::Float(v) => v as $t,
-        };
+        }
       }
     }
   };
@@ -177,19 +177,19 @@ impl_bitwise_op!(Shr, shr, >>);
 impl std::ops::Neg for Value {
   type Output = Value;
   fn neg(self) -> Value {
-    return match self {
+    match self {
       Value::Integer(v, w) => Value::Integer(v.wrapping_neg() & w.mask(), w),
       Value::Float(v) => Value::Float(-v),
-    };
+    }
   }
 }
 impl std::ops::Not for Value {
   type Output = Value;
   fn not(self) -> Value {
-    return match self {
+    match self {
       Value::Integer(v, w) => Value::Integer(!v & w.mask(), w),
       Value::Float(v) => Value::Integer((v != 0f64) as u64, Width::U8),
-    };
+    }
   }
 }
 
@@ -198,7 +198,7 @@ impl Eq for Value {}
 
 impl Ord for Value {
   fn cmp(&self, other: &Self) -> Ordering {
-    return match self {
+    match self {
       Value::Integer(v1, w) => match other {
         Value::Integer(v2, _) => cmp!(*v1, *v2, w),
         Value::Float(v2) => cmp!(*v1, *v2, w),
@@ -224,7 +224,7 @@ impl Ord for Value {
           }
         }
       },
-    };
+    }
   }
 }
 
