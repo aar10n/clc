@@ -1,6 +1,6 @@
 use crate::functions::{get_constant, get_function, Function};
 use crate::lexer::Token;
-use crate::value::{Value, Width};
+use crate::value::{Unit, Value, Width};
 use phf::phf_map;
 
 const PRECEDENCE_TABLE: phf::Map<&'static str, (i32, Assoc)> = phf_map! {
@@ -53,7 +53,7 @@ fn convert_expr_posfix(expr: Vec<Token>) -> Result<Vec<Token>, String> {
       Token::Value(_) => rpn_expr.push(token),
       Token::Identifier(id) => {
         if let Some(value) = get_constant(&id) {
-          rpn_expr.push(Token::Value(value));
+          rpn_expr.push(Token::from(value));
         } else if let Some(_) = get_function(&id) {
           op_stack.push(Token::Identifier(id));
         } else {
@@ -142,7 +142,7 @@ fn evaluate_expr_postfix(expr: &Vec<Token>) -> Result<Value, String> {
         }
 
         let arg = stack.pop().unwrap();
-        stack.push(func(arg));
+        stack.push(func(arg)?);
       }
       Function::Binary(func) => {
         if nargs < 2 {
@@ -151,7 +151,19 @@ fn evaluate_expr_postfix(expr: &Vec<Token>) -> Result<Value, String> {
 
         let arg2 = stack.pop().unwrap();
         let arg1 = stack.pop().unwrap();
-        stack.push(func(arg1, arg2));
+        let unit = match (arg1.unit, arg2.unit) {
+          (Unit::Raw, _) => arg2.unit,
+          (_, Unit::Raw) => arg1.unit,
+          _ => arg1.unit,
+        };
+
+        let arg1 = arg1
+          .convert(unit)
+          .ok_or(format!("Unable to convert {} to {}", arg1.unit, unit))?;
+        let arg2 = arg2
+          .convert(unit)
+          .ok_or(format!("Unable to convert {} to {}", arg2.unit, unit))?;
+        stack.push(func(arg1, arg2)?);
         nargs -= 1; // we popped two but added one back
       }
     }
@@ -190,7 +202,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<Value, String> {
   if last.is_some() {
     return Ok(*last.unwrap());
   }
-  return Ok(Value::Integer(0, Width::U64));
+  return Ok(Value::default());
 }
 
 #[cfg(test)]
@@ -199,15 +211,15 @@ mod tests {
   use crate::tokenize;
   use test_case::test_case;
 
-  #[test_case("()" => Ok(Value::Integer(0, Width::U64)))]
-  #[test_case("1" => Ok(Value::Integer(1, Width::U64)))]
-  #[test_case("1 + 2" => Ok(Value::Integer(3, Width::U64)))]
-  #[test_case("1.5 * 3" => Ok(Value::Float(4.5)))]
-  #[test_case("3 * 1.5" => Ok(Value::Integer(3, Width::U64)))]
-  #[test_case("(1 + 2) * 3" => Ok(Value::Integer(9, Width::U64)))]
-  #[test_case("sin(deg(90))" => Ok(Value::Float(1.0)))]
-  #[test_case("u32(1)" => Ok(Value::Integer(1, Width::U32)))]
-  #[test_case("u32(1) + 1" => Ok(Value::Integer(2, Width::U32)))]
+  #[test_case("()" => Ok(Value::new_integer(0, Width::U64)))]
+  #[test_case("1" => Ok(Value::new_integer(1, Width::U64)))]
+  #[test_case("1 + 2" => Ok(Value::new_integer(3, Width::U64)))]
+  #[test_case("1.5 * 3" => Ok(Value::new_float(4.5)))]
+  #[test_case("3 * 1.5" => Ok(Value::new_integer(3, Width::U64)))]
+  #[test_case("(1 + 2) * 3" => Ok(Value::new_integer(9, Width::U64)))]
+  #[test_case("sin(deg(90))" => Ok(Value::new_float(1.0)))]
+  #[test_case("u32(1)" => Ok(Value::new_integer(1, Width::U32)))]
+  #[test_case("u32(1) + 1" => Ok(Value::new_integer(2, Width::U32)))]
   fn test_parse(input: &str) -> Result<Value, String> {
     let tokens = tokenize(input)?;
     parse(tokens)

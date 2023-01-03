@@ -1,14 +1,111 @@
-use crate::value::Value;
+use crate::value::{Number, Unit, Value};
 use phf::phf_map;
-
-#[rustfmt::skip] macro_rules! constant { ($value:expr) => { || Value::from($value) }; }
-#[rustfmt::skip] macro_rules! unary { ($func:expr) => { Function::Unary(|v: Value| Value::from($func(v))) }; }
-#[rustfmt::skip] macro_rules! binary { ($func:expr) => { Function::Binary(|v1: Value, v2: Value| Value::from($func(v1, v2))) }; }
 
 #[derive(Copy, Clone, Debug)]
 pub enum Function {
-  Unary(fn(Value) -> Value),
-  Binary(fn(Value, Value) -> Value),
+  Unary(fn(Value) -> Result<Value, String>),
+  Binary(fn(Value, Value) -> Result<Value, String>),
+}
+
+/// A macro to define constant values.
+macro_rules! constant {
+  ($value:expr) => {
+    || Value::new_raw(Number::from($value))
+  };
+}
+
+/// A macro to define pure unary functions.
+///
+/// The macro wraps a given closure in `Function::Unary` and handles the conversion from `Value`
+/// to the parameter type and back again. The closure must have the parameter explicitly typed
+/// and should be `Number` or a primitive type convertible from `Number`. It should return a
+/// value convertible to `Number`.
+///
+/// ## Examples
+///
+/// ```
+/// unary!(|v: f64| v.sin())
+/// unary!(|v: Number| f64::from(v).sin())
+/// ```
+macro_rules! unary {
+  (|$param:ident: Value| $($rest:tt)*) => { unary!(_ Value |$param: Value| $($rest)*) };
+  (|$param:ident: $type:ty| $($rest:tt)*) => { unary!(_ $type |$param: $type| $($rest)*) };
+  (|$param:ident| $($rest:tt)*) => { unary!(_ Value |$param: Value| $($rest)*) };
+  // internally invoked by the above
+  (_ Value $callable:expr) => {
+    Function::Unary(|v: Value| {
+      Ok(Value::from($callable(v)))
+    })
+  };
+  (_ $ty:tt $callable:expr) => {
+    Function::Unary(|v: Value| {
+      Ok(Value::from((Number::from($callable(<$ty>::from(v.number))), v.unit)))
+    })
+  };
+}
+
+/// A macro to define binary functions.
+///
+/// The macro wraps a given closure in `Function::Binary` and handles the conversion from `Value`
+/// to the parameter type and back again. The closure must have the parameters explicitly typed
+/// and both should be `Number` or a primitive type convertible from `Number`. It should return
+/// a value convertible to `Number`.
+///
+/// ## Examples
+///
+/// ```
+/// binary!(|v1: f64, v2: f64| v1 + v2)
+/// binary!(|v1: Number, v2: Number| v1 + v2)
+/// ```
+macro_rules! binary {
+  (|$p1:ident: Value, $p2:ident: Value| $($rest:tt)*) => { binary!(_ Value |$p1: Value, $p2: Value| $($rest)*) };
+  (|$p1:ident: $t1:ty, $p2:ident: $t2:ty| $($rest:tt)*) => { binary!(_ $t1 $t2 |$p1: $t1, $p2: $t2| $($rest)*) };
+  (|$p1:ident, $p2:ident| $($rest:tt)*) => { binary!(_ Value |$p1: Value, $p2: Value| $($rest)*) };
+  // internally invoked by the above
+  (_ Value $callable:expr) => {
+    Function::Binary(|a: Value, b: Value| {
+      Ok(Value::from($callable(a, b)))
+    })
+  };
+  (_ $t1:tt $t2:tt $callable:expr) => {
+    Function::Binary(|a: Value, b: Value| {
+      let unit = a.unit;
+      let a = <$t1>::from(a.number);
+      let b = <$t2>::from(b.number);
+      Ok(Value::from((Number::from($callable(a, b)), unit)))
+    })
+  };
+}
+
+/// A macro to define casting functions.
+macro_rules! cast {
+  ($type:ty) => {
+    Function::Unary(|v: Value| Ok(Value::from((Number::from(<$type>::from(v.number)), Unit::Raw))))
+  };
+}
+
+/// A macro to define conversion functions.
+macro_rules! convert {
+  // convert to a specific unit using any available conversion
+  ($unit:expr) => {
+    Function::Unary(|v: Value| {
+      v.convert($unit)
+        .ok_or(format!("Invalid conversion from {} to {}", v.unit, $unit))
+    })
+  };
+  // convert to a specific unit from another given unit (or raw)
+  ($from:expr => $to:expr) => {
+    Function::Unary(|v: Value| {
+      if v.unit == Unit::Raw {
+        Ok(Unit::normalize(v.number, $to))
+      } else if v.unit == $from {
+        v.convert($unit)
+          .ok_or(format!("Invalid conversion from {} to {}", v.unit, $unit))
+      } else {
+        Err(format!("Conversion from {} to {} is not supported", v.unit, $unit))
+      }
+    })
+  };
 }
 
 //
@@ -42,63 +139,87 @@ const CONST_TABLE: phf::Map<&'static str, fn() -> Value> = phf_map! {
 
 const FUNC_TABLE: phf::Map<&'static str, Function> = phf_map! {
   // operators
-  "+u" => unary!(|v| v),
-  "-u" => unary!(|v| -(v as Value)),
-  "!u" => unary!(|v| !bool::from(v)),
-  "~u" => unary!(|v| !(v as Value)),
+  "+u" => unary!(|v: Number| v),
+  "-u" => unary!(|v: Number| -v),
+  "!u" => unary!(|v: bool| !v),
+  "~u" => unary!(|v: Number| !v),
 
-  "+" => binary!(|a, b| a + b),
-  "-" => binary!(|a, b| (a as Value) - (b as Value)),
-  "*" => binary!(|a, b| a * b),
-  "/" => binary!(|a, b| a / b),
-  "%" => binary!(|a, b| a % b),
+  "+" => binary!(|a: Number, b: Number| a + b),
+  "-" => binary!(|a: Number, b: Number| a - b),
+  "*" => binary!(|a: Number, b: Number| a * b),
+  "/" => binary!(|a: Number, b: Number| a / b),
+  "%" => binary!(|a: Number, b: Number| a % b),
 
-  "&" => binary!(|a, b| a & b),
-  "|" => binary!(|a, b| a | b),
-  "^" => binary!(|a, b| a ^ b),
+  "&" => binary!(|a: Number, b: Number| a & b),
+  "|" => binary!(|a: Number, b: Number| a | b),
+  "^" => binary!(|a: Number, b: Number| a ^ b),
 
-  "<<" => binary!(|a, b| a << b),
-  ">>" => binary!(|a, b| a >> b),
+  "<<" => binary!(|a: Number, b: Number| a << b),
+  ">>" => binary!(|a: Number, b: Number| a >> b),
 
-  "<" => binary!(|a, b| Value::from(a < b)),
-  ">" => binary!(|a, b| Value::from(a > b)),
-  ">=" => binary!(|a, b| Value::from(a >= b)),
-  "<=" => binary!(|a, b| Value::from(a <= b)),
-  "==" => binary!(|a, b| Value::from(a == b)),
-  "!=" => binary!(|a, b| Value::from(a != b)),
+  "<" => binary!(|a: Number, b: Number| a < b),
+  ">" => binary!(|a: Number, b: Number| a > b),
+  ">=" => binary!(|a: Number, b: Number| a >= b),
+  "<=" => binary!(|a: Number, b: Number| a <= b),
+  "==" => binary!(|a: Number, b: Number| a == b),
+  "!=" => binary!(|a: Number, b: Number| a != b),
 
-  "&&" => binary!(|a, b| Value::from(bool::from(a) && bool::from(b))),
-  "||" => binary!(|a, b| Value::from(bool::from(a) || bool::from(b))),
+  "&&" => binary!(|a: bool, b: bool| a && b),
+  "||" => binary!(|a: bool, b: bool| a || b),
 
   // casting
-  "u64" => unary!(|v| u64::from(v)),
-  "u32" => unary!(|v| u32::from(v)),
-  "u16" => unary!(|v| u16::from(v)),
-  "u8" => unary!(|v| u8::from(v)),
-  "i64" => unary!(|v| i64::from(v)),
-  "i32" => unary!(|v| i32::from(v)),
-  "i16" => unary!(|v| i16::from(v)),
-  "i8" => unary!(|v| i8::from(v)),
-  "f64" => unary!(|v| f64::from(v)),
+  "u64" => cast!(u64),
+  "u32" => cast!(u32),
+  "u16" => cast!(u16),
+  "u8" => cast!(u8),
+  "i64" => cast!(i64),
+  "i32" => cast!(i32),
+  "i16" => cast!(i16),
+  "i8" => cast!(i8),
+  "f64" => cast!(f64),
 
-  // unary functions
-  "abs" => unary!(|v| if v < Value::from(0) { -(v as Value) } else { v }),
-  "sin" => unary!(|v| f64::from(v).sin()),
-  "cos" => unary!(|v| f64::from(v).cos()),
-  "tan" => unary!(|v| f64::from(v).tan()),
-  "asin" => unary!(|v| f64::from(v).asin()),
-  "acos" => unary!(|v| f64::from(v).asin()),
-  "atan" => unary!(|v| f64::from(v).asin()),
-  "floor" => unary!(|v| f64::from(v).floor()),
-  "ceil" => unary!(|v| f64::from(v).ceil()),
-  "round" => unary!(|v| f64::from(v).round()),
-  "sqrt" => unary!(|v| f64::from(v).sqrt()),
-  "exp" => unary!(|v| f64::from(v).exp()),
-  "ln" => unary!(|v| f64::from(v).ln()),
-  "log2" => unary!(|v| f64::from(v).log2()),
-  "log10" => unary!(|v| f64::from(v).log10()),
-  "deg" => unary!(|v| f64::from(v) / (std::f64::consts::FRAC_1_PI * 180.0)),
-  "rad" => unary!(|v| f64::from(v) * (std::f64::consts::FRAC_1_PI * 180.0)),
+  // unit conversion
+  "bytes" => convert!(Unit::Byte),
+  "kilobyte" => convert!(Unit::Kilobyte),
+  "megabyte" => convert!(Unit::Megabyte),
+  "gigabyte" => convert!(Unit::Gigabyte),
+  "terabyte" => convert!(Unit::Terabyte),
+  "petabyte" => convert!(Unit::Petabyte),
+
+  "celsius" => convert!(Unit::Celsius),
+  "fahrenheit" => convert!(Unit::Fahrenheit),
+  "kelvin" => convert!(Unit::Kelvin),
+
+  // functions
+  "abs" => unary!(|v: Number| v.abs()),
+  "sin" => unary!(|v: f64| v.sin()),
+  "cos" => unary!(|v: f64| v.cos()),
+  "tan" => unary!(|v: f64| v.tan()),
+  "asin" => unary!(|v: f64| v.asin()),
+  "acos" => unary!(|v: f64| v.asin()),
+  "atan" => unary!(|v: f64| v.asin()),
+  "floor" => unary!(|v: f64| v.floor()),
+  "ceil" => unary!(|v: f64| v.ceil()),
+  "round" => unary!(|v: f64| v.round()),
+  "sqrt" => unary!(|v: f64| v.sqrt()),
+  "exp" => unary!(|v: f64| v.exp()),
+  "ln" => unary!(|v: f64| v.ln()),
+  "log2" => unary!(|v: f64| v.log2()),
+  "log10" => unary!(|v: f64| v.log10()),
+  "deg" => unary!(|v: f64| v / (std::f64::consts::FRAC_1_PI * 180.0)),
+  "rad" => unary!(|v: f64| v * (std::f64::consts::FRAC_1_PI * 180.0)),
+};
+
+const ALIAS_TABLE: phf::Map<&'static str, &'static str> = phf_map! {
+  "KiB" => "kilobyte",
+  "MiB" => "megabyte",
+  "GiB" => "gigabyte",
+  "TiB" => "terabyte",
+  "PiB" => "petabyte",
+
+  "tempC" => "celsius",
+  "tempF" => "fahrenheit",
+  "tempK" => "kelvin",
 };
 
 pub fn get_constant(name: &str) -> Option<Value> {
@@ -106,5 +227,10 @@ pub fn get_constant(name: &str) -> Option<Value> {
 }
 
 pub fn get_function(name: &str) -> Option<Function> {
-  FUNC_TABLE.get(name).cloned()
+  FUNC_TABLE.get(name).map(|f| f.clone()).or_else(|| {
+    ALIAS_TABLE
+      .get(name)
+      .and_then(|alias| FUNC_TABLE.get(alias))
+      .map(|f| f.clone())
+  })
 }

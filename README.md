@@ -1,15 +1,15 @@
 # Command Line Calculator
 
 This is a simple yet powerful calculator built with programmers in mind. It 
-supports all standard arithmetic, bitwise and logical operators, numerous 
-mathematical functions and numbers with differing bases. It also features a
-lose "type system" allowing calculations to be performed on fixed-width
-integers.
+supports all standard arithmetic, bitwise and logical operators and a number 
+of built-in constants and functions. It also features a loose type system which
+allows calculations to be performed on floats or fixed-width integers. It also 
+supports a set of standard units and conversion between them.
 
-While this can be used as a simple shell calculator, it was originally written
-to be used with the popular macOS productivity tool [Alfred](https://www.alfredapp.com/). 
-As such, support for Alfred has been built-in to the calculator itself, and the provided 
-Makefile can be used to build the Alfred workflow.
+While this can be used as a simple shell calculator, it is mainly written to be 
+used with the popular macOS productivity tool [Alfred](https://www.alfredapp.com/). 
+As such, support for Alfred has been built-in to the calculator itself, and the 
+provided Makefile can be used to build the Alfred workflow.
 
 ## Options
 
@@ -21,28 +21,82 @@ option.
 USAGE:
     clc [OPTIONS]
 
-FLAGS:
-    -h, --help       Print help information
-    -V, --version    Print version information
-
 OPTIONS:
-    -e, --expr <EXPRESSION>     Expression to evaluate
-    -f, --file <FILE>           Read expression from file
-    -o <FORMAT>                 Output format [all|bin|hex|oct|alfred]
+    -f, --file <FILE>  Read expression from file
+    -e, --expr <EXPR>  Expression to evaluate
+        --alfred       Enables alfred JSON output
+    -h, --help         Print help information
+    -V, --version      Print version information
 ```
 
-## Built-ins
+With the `--alfred` option, the calculator will output Alfred JSON Script Filter
+items. For floating point results, it will output a just the value, but for integer 
+results, it will output items for the decimal, binary, octal and hexadecimal forms. 
+In the case of results with a unit, it will output items for all common conversions 
+for the result.
 
-The following types are supported:
+## Usage
 
-- `i8/u8` - Signed/unsigned 8-bit integral types
-- `i16/u16` - Signed/unsigned 16-bit integral types
-- `i32/u32` - Signed/unsigned 32-bit integral types
-- `i64/u64` - Signed/unsigned 64-bit integral types
-- `f64` - Double precision floating point type
+The calculator supports standard expressions that include numbers, binary and
+unary operators, as well as built-in functions and constants. It also accepts
+units specified in the form of `<number><unit>`.
 
+The following number formats are supported:
+- `1.234` - decimal (type: `f64`)
+- `1234` - integer (type: `u64`)
+- `0b1010` - binary (type: `u64`)
+- `0o1234` - octal (type: `u64`)
+- `0x1234` - hexadecimal (type: `u64`)
 
-### Constants
+As an expression is being evaluated, values are implicitly cast and unit conversion 
+is be performed when necessary. For binary operators, the right-hand side is always
+cast to the type of the left-hand side before the operation is performed. For some
+functions, the parameter is cast to the expected type before the function is called.
+
+### Types and Units
+
+The following table describes the types supported by the calculator. Each name is a
+built-in function that can be used to cast to the specified type. When used, the unit
+of the number is lost.
+
+| **Name**  | **Description**     |
+|-----------|---------------------|
+| `u64()`   | Casts number to u64 |
+| `u32()`   | Casts number to u32 |
+| `u16()`   | Casts number to u16 |
+| `u8()`    | Casts number to u8  |
+| `i64()`   | Casts number to i64 |
+| `i32()`   | Casts number to i32 |
+| `i16()`   | Casts number to i16 |
+| `i8()`    | Casts number to i8  |
+| `f64()`   | Casts number to f64 |
+
+The following table describes the units supported by the calculator. They can be used
+in expressions like literals `<number><suffix>` or as a function call to convert to
+the specified unit `<name>(<number>)`.
+
+| **Name**       | **Suffix** | **Type** |
+|----------------|------------|----------|
+| `bytes()`      | `B`        | `u64`    |
+| `kilobyte()`   | `K`        | `u64`    |
+| `megabyte()`   | `M`        | `u64`    |
+| `gigabyte()`   | `G`        | `u64`    |
+| `terabyte()`   | `T`        | `u64`    |
+| `petabyte()`   | `P`        | `u64`    |
+| **Name**       | **Suffix** | **Type** |
+| `celsius()`    | `°`, `°C`  | `f64`    |
+| `fahrenheit()` | `°F`       | `f64`    |
+| `kelvin()`     | `°K`       | `f64`    |
+
+For example:
+```
+celsius(32.0°F) // converts 32.0 fahrenheit to degrees celsius
+fahrenheit(100) // casts 100 to f64 and specifies it is in fahrenheit
+
+kilobyte(1°C)   // not allowed - units not of the same type
+```
+
+### Built-in Constants
 
 | **Name**     | **Description**          | **Type** |
 |--------------|--------------------------|----------|
@@ -51,10 +105,10 @@ The following types are supported:
 | `NAN`        | Not a number (NaN)       | `f64`    |
 | `INF`        | Infinity (∞)             | `f64`    |
 | `NEG_INF`    | Negative infinity (-∞)   | `f64`    |
-| `<type>_MIN` | Minimum value of type    | `type`   |
-| `<type>_MAX` | Maximum value of type    | `type`   |   
+| `<TYPE>_MIN` | Minimum value of type    | `type`   |
+| `<TYPE>_MAX` | Maximum value of type    | `type`   |   
 
-### Functions
+### Built-in Functions
 
 | **Name**  | **Description**                     | **Type** |
 |-----------|-------------------------------------|----------|
@@ -75,15 +129,6 @@ The following types are supported:
 | `log10()` | Compute base 10 logarithm of number | `f64`    |
 | `deg()`   | Converts degrees to radians         | `f64`    |
 | `rad()`   | Converts radians to degrees         | `f64`    |
-| **Name**  | **Description**                     | **Type** |
-| `u64()`   | Casts number to u64                 | `u64`    |
-| `u32()`   | Casts number to u32                 | `u32`    |
-| `u16()`   | Casts number to u16                 | `u16`    |
-| `u8() `   | Casts number to u8                  | `u8`     |
-| `i64()`   | Casts number to i64                 | `i64`    |
-| `i32()`   | Casts number to i32                 | `i32`    |
-| `i16()`   | Casts number to i16                 | `i16`    |
-| `i8()`    | Casts number to i8                  | `i8`     |
 
 ## Author
 

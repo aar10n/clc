@@ -79,7 +79,7 @@
 				<key>runningsubtext</key>
 				<string>calculating...</string>
 				<key>script</key>
-				<string>echo "{query}" | ./clc -o=alfred</string>
+				<string>echo "{query}" | ./clc --alfred</string>
 				<key>scriptargtype</key>
 				<integer>0</integer>
 				<key>scriptfile</key>

@@ -1,4 +1,4 @@
-use crate::value::Value;
+use crate::value::{Number, Unit, Value};
 use logos::{Lexer, Logos};
 use std::str::FromStr;
 
@@ -47,13 +47,19 @@ impl Token {
   }
 }
 
+impl From<Number> for Token {
+  fn from(number: Number) -> Self {
+    Token::Value(Value::new_number(number))
+  }
+}
+
 impl From<Value> for Token {
   fn from(value: Value) -> Self {
     Token::Value(value)
   }
 }
 
-/// Raw tokens produced by the lexer.
+/// An intermediate token produced by the lexer.
 #[derive(Logos, Clone, Debug, PartialEq)]
 pub enum RawToken {
   // eg. 101, 0x1F, 0o777, 0b1101
@@ -62,7 +68,9 @@ pub enum RawToken {
   // eg. 3.141, 0.0001, 2., .5
   #[regex(r"\d+\.\d*|\.\d+", conv_float)]
   Float(f64),
-
+  // eg. G, kg, °C
+  #[regex(r"([BKMGTP]|°[CFK]?)", priority = 2)]
+  Unit,
   // eg. sin, cos, PI
   #[regex(r"[a-zA-Z][a-zA-Z0-9_]*")]
   Identifier,
@@ -110,8 +118,18 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
 
   while let Some(token) = lexer.next() {
     match token {
-      RawToken::Integer(i) => tokens.push(Token::Value(Value::from(i))),
-      RawToken::Float(f) => tokens.push(Token::Value(Value::from(f))),
+      RawToken::Integer(i) => tokens.push(Token::from(Number::from(i))),
+      RawToken::Float(f) => tokens.push(Token::from(Number::from(f))),
+      RawToken::Unit => {
+        let number = tokens.pop().ok_or("Expexted number before unit")?;
+        let unit = Unit::from_str(lexer.slice()).unwrap();
+        let value = match number {
+          Token::Value(v) => Value::new(v.number, unit),
+          _ => return Err(format!("Unexpected token before unit '{}'", lexer.slice())),
+        };
+
+        tokens.push(Token::Value(value));
+      }
       RawToken::Identifier => tokens.push(Token::Identifier(lexer.slice().to_string())),
       RawToken::Operator => {
         match lexer.slice() {
@@ -151,9 +169,9 @@ mod tests {
   use super::*;
 
   #[rustfmt::skip]
-  macro_rules! u64_t { ($value:literal) => { Token::Value(Value::from($value as u64)) }; }
+  macro_rules! u64_t { ($value:literal) => { Token::from(Number::from($value as u64)) }; }
   #[rustfmt::skip]
-  macro_rules! f64_t { ($value:literal) => { Token::Value(Value::from($value as f64)) }; }
+  macro_rules! f64_t { ($value:literal) => { Token::from(Number::from($value as f64)) }; }
   #[rustfmt::skip]
   macro_rules! id_t { ($value:literal) => { Token::Identifier($value.to_string()) }; }
   #[rustfmt::skip]
