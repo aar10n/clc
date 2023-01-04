@@ -49,9 +49,9 @@ The following number formats are supported:
 - `0x1234` - hexadecimal (type: `u64`)
 
 As an expression is being evaluated, values are implicitly cast and unit conversion 
-is be performed when necessary. For binary operators, the right-hand side is always
-cast to the type of the left-hand side before the operation is performed. For some
-functions, the parameter is cast to the expected type before the function is called.
+is performed when necessary. For binary operators, the right-hand side is always cast 
+to the type of the left-hand side before the operation is performed. For some functions, 
+the parameter is cast to the expected type before the function is called.
 
 ### Types and Units
 
@@ -106,7 +106,9 @@ kilobyte(1°C)   // not allowed - units not of the same type
 | `INF`        | Infinity (∞)             | `f64`    |
 | `NEG_INF`    | Negative infinity (-∞)   | `f64`    |
 | `<TYPE>_MIN` | Minimum value of type    | `type`   |
-| `<TYPE>_MAX` | Maximum value of type    | `type`   |   
+| `<TYPE>_MAX` | Maximum value of type    | `type`   |
+
+View the [source](https://github.com/aar10n/clc/blob/master/src/functions.rs#L113) for the full list.
 
 ### Built-in Functions
 
@@ -130,6 +132,9 @@ kilobyte(1°C)   // not allowed - units not of the same type
 | `deg()`   | Converts degrees to radians         | `f64`    |
 | `rad()`   | Converts radians to degrees         | `f64`    |
 
+View the [source](https://github.com/aar10n/clc/blob/master/src/functions.rs#L140) for the full list
+of operators, functions, conversions and aliases.
+
 ## Author
 
 Aaron Gill-Braun aarongillbraun@gmail.com
@@ -140,8 +145,6 @@ This project was inspired by [radix-calc](https://github.com/goodell/radix-calc)
 
 MIT License, see the LICENSE file.
 
-The icons used in the Alfred workflow were taken from radix-calc. The main 
-calculator icon was originally taken from [Aiconica](https://aiconica.net/detail/calculator-1000),
-licensed CC0 1.0. The dec/hex/oct/bin icons are orginal works by the author of
-[radix-calc](https://github.com/goodell/radix-calc) and are also licensed under CC0 1.0.
+The main calculator icon was originally taken from [Aiconica](https://aiconica.net/detail/calculator-1000),
+licensed CC0 1.0.
 

@@ -167,6 +167,25 @@ const FUNC_TABLE: phf::Map<&'static str, Function> = phf_map! {
   "&&" => binary!(|a: bool, b: bool| a && b),
   "||" => binary!(|a: bool, b: bool| a || b),
 
+  // functions
+  "abs" => unary!(|v: Number| v.abs()),
+  "sin" => unary!(|v: f64| v.sin()),
+  "cos" => unary!(|v: f64| v.cos()),
+  "tan" => unary!(|v: f64| v.tan()),
+  "asin" => unary!(|v: f64| v.asin()),
+  "acos" => unary!(|v: f64| v.asin()),
+  "atan" => unary!(|v: f64| v.asin()),
+  "floor" => unary!(|v: f64| v.floor()),
+  "ceil" => unary!(|v: f64| v.ceil()),
+  "round" => unary!(|v: f64| v.round()),
+  "sqrt" => unary!(|v: f64| v.sqrt()),
+  "exp" => unary!(|v: f64| v.exp()),
+  "ln" => unary!(|v: f64| v.ln()),
+  "log2" => unary!(|v: f64| v.log2()),
+  "log10" => unary!(|v: f64| v.log10()),
+  "deg" => unary!(|v: f64| v / (std::f64::consts::FRAC_1_PI * 180.0)),
+  "rad" => unary!(|v: f64| v * (std::f64::consts::FRAC_1_PI * 180.0)),
+
   // casting
   "u64" => cast!(u64),
   "u32" => cast!(u32),
@@ -189,25 +208,6 @@ const FUNC_TABLE: phf::Map<&'static str, Function> = phf_map! {
   "celsius" => convert!(Unit::Celsius),
   "fahrenheit" => convert!(Unit::Fahrenheit),
   "kelvin" => convert!(Unit::Kelvin),
-
-  // functions
-  "abs" => unary!(|v: Number| v.abs()),
-  "sin" => unary!(|v: f64| v.sin()),
-  "cos" => unary!(|v: f64| v.cos()),
-  "tan" => unary!(|v: f64| v.tan()),
-  "asin" => unary!(|v: f64| v.asin()),
-  "acos" => unary!(|v: f64| v.asin()),
-  "atan" => unary!(|v: f64| v.asin()),
-  "floor" => unary!(|v: f64| v.floor()),
-  "ceil" => unary!(|v: f64| v.ceil()),
-  "round" => unary!(|v: f64| v.round()),
-  "sqrt" => unary!(|v: f64| v.sqrt()),
-  "exp" => unary!(|v: f64| v.exp()),
-  "ln" => unary!(|v: f64| v.ln()),
-  "log2" => unary!(|v: f64| v.log2()),
-  "log10" => unary!(|v: f64| v.log10()),
-  "deg" => unary!(|v: f64| v / (std::f64::consts::FRAC_1_PI * 180.0)),
-  "rad" => unary!(|v: f64| v * (std::f64::consts::FRAC_1_PI * 180.0)),
 };
 
 const ALIAS_TABLE: phf::Map<&'static str, &'static str> = phf_map! {
